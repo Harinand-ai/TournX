@@ -1,0 +1,61 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        mc: {
+          dirt: '#2d1e12',
+          darkdirt: '#1b1208',
+          grass: '#4a7227',
+          grasslight: '#5b8e30',
+          grassdark: '#2f4d15',
+          stone: '#707070',
+          darkstone: '#373737',
+          lightstone: '#8f8f8f',
+          wood: '#5c3e1e',
+          diamond: '#4dedf4',
+          emerald: '#17dd62',
+          gold: '#fdb813',
+          redstone: '#ff2222',
+          obsidian: '#1b1226',
+          gui: '#362d26',
+          guilight: '#483c33',
+          guiborder: '#18120c',
+          text: '#f5ebd7',
+          textyellow: '#ffff55',
+        },
+        football: {
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          500: '#17dd62',
+          600: '#4a7227',
+          700: '#38571d',
+          800: '#273d13',
+          900: '#17240a',
+        },
+      },
+      fontFamily: {
+        display: ['"Press Start 2P"', '"Silkscreen"', 'monospace'],
+        sans: ['"VT323"', '"Press Start 2P"', 'monospace'],
+        pixel: ['"Press Start 2P"', 'monospace'],
+        mono: ['"VT323"', 'monospace'],
+      },
+      borderRadius: {
+        'none': '0px',
+        'sm': '0px',
+        'md': '0px',
+        'lg': '0px',
+        'xl': '0px',
+        '2xl': '0px',
+        'full': '0px',
+      },
+    },
+  },
+  plugins: [],
+};
