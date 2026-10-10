@@ -1,15 +1,15 @@
-export type Position = 'GK' | 'CB' | 'MID' | 'CF' | 'TBD';
+export type Position = 'GK' | 'CB' | 'DEF' | 'MID' | 'CF' | 'FWD' | 'TBD';
 
 export type MatchStatus = 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
 
 export interface Team {
   id: string;
   name: string;
-  short_name: string;
-  manager_name: string;
+  short_name?: string;
+  manager_name?: string;
   logo_url?: string;
-  primary_color: string;
-  secondary_color: string;
+  primary_color?: string;
+  secondary_color?: string;
   created_at?: string;
 }
 
@@ -27,21 +27,24 @@ export interface Player {
 export interface Match {
   id: string;
   match_number: number;
-  round_number: number;
+  round_number?: number;
   home_team_id: string;
   away_team_id: string;
-  scheduled_date: string | null;
-  scheduled_time: string | null;
-  venue: string | null;
-  referee: string | null;
-  assistant_referee_1: string | null;
-  assistant_referee_2: string | null;
+  scheduled_date?: string | null;
+  scheduled_time?: string | null;
+  date?: string;
+  time?: string;
+  venue?: string | null;
+  referee?: string | null;
+  assistant_referee_1?: string | null;
+  assistant_referee_2?: string | null;
   status: MatchStatus;
   home_score: number | null;
   away_score: number | null;
   created_at?: string;
   updated_at?: string;
 }
+
 
 export interface Goal {
   id: string;

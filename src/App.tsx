@@ -28,8 +28,10 @@ import { PlayerProfileModal } from './components/PlayerProfileModal';
 import { LiveMatchModal } from './components/LiveMatchModal';
 import { TournamentSwitcherModal } from './components/TournamentSwitcherModal';
 import { CreateTournamentModal } from './components/CreateTournamentModal';
+import { AccessCodeModal } from './components/AccessCodeModal';
 import { Analytics } from '@vercel/analytics/react';
 import { Trophy, Plus, RefreshCw } from 'lucide-react';
+
 
 export interface RouteState {
   tab: string;
@@ -106,8 +108,15 @@ export function App() {
   // Modals state
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [isLiveWindowOpen, setIsLiveWindowOpen] = useState(false);
+
+  // Authorization Role for active tournament ('VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS')
+  const [sessionRole, setSessionRole] = useState<'VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS'>(() => {
+    return localDataService.getSessionRole(activeTournament.id);
+  });
+
 
   // Intro state: Show animation at first when the site is opened
   const [showIntro, setShowIntro] = useState<boolean>(() => {
@@ -169,7 +178,9 @@ export function App() {
       setGoals(gData);
       setMotms(motmData);
       setActivePolls(pollsData.filter(p => p.status === 'active'));
+      setSessionRole(localDataService.getSessionRole(tourney.id));
     } catch (err) {
+
       console.error('Error fetching tournament data:', err);
     } finally {
       setLoading(false);
@@ -438,10 +449,12 @@ export function App() {
             onRedirectToLogin={() => handleNavigate('admin/login')}
           >
             <AdminDashboardPage
+              tournament={activeTournament}
               teams={teams}
               matches={matches}
               players={players}
               goals={goals}
+              assists={[]}
               motms={motms}
               standings={standings}
               topScorers={topScorers}
@@ -495,6 +508,8 @@ export function App() {
         isAdminLoggedIn={isAdminLoggedIn}
         activeTournamentName={activeTournament?.name}
         onOpenTournamentSwitcher={() => setIsSwitcherOpen(true)}
+        onOpenAccessCode={() => setIsAccessModalOpen(true)}
+        sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
       />
 
       {/* TournX Multi-Tournament Development Banner */}
@@ -577,6 +592,17 @@ export function App() {
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         onTournamentCreated={handleTournamentChanged}
+      />
+
+      {/* Access Code Modal (VIEW / SCORE) */}
+      <AccessCodeModal
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        tournament={activeTournament}
+        onSuccess={(role) => {
+          setSessionRole(role);
+          loadData();
+        }}
       />
 
       {/* Player Profile Modal */}

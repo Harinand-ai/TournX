@@ -13,7 +13,13 @@ import {
   POTMVote,
   CommitteeMember,
 } from '../types/tournament';
+import { Tournament } from '../types/multiTenant';
 import { tournamentService } from '../services/tournamentService';
+import { localDataService } from '../services/localDataService';
+import { FixtureGeneratorSection } from '../components/admin/FixtureGeneratorSection';
+import { AccessCodesSection } from '../components/admin/AccessCodesSection';
+import { BulkImportSection } from '../components/admin/BulkImportSection';
+import { TournamentSettingsSection } from '../components/admin/TournamentSettingsSection';
 import { TeamBadge } from '../components/TeamBadge';
 import { 
   Shield, 
@@ -28,10 +34,15 @@ import {
   CheckCircle2,
   AlertCircle,
   Phone,
-  X
+  X,
+  Wand2,
+  KeyRound,
+  FileSpreadsheet,
+  Settings
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
+  tournament?: Tournament;
   teams: Team[];
   matches: Match[];
   players: Player[];
@@ -46,6 +57,7 @@ interface AdminDashboardPageProps {
 }
 
 export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
+  tournament: propTournament,
   teams,
   matches,
   players,
@@ -55,7 +67,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   onLogout,
   onNavigateHome,
 }) => {
-  const [activeTab, setActiveTab] = useState<'matches' | 'players' | 'teams' | 'potm' | 'committee'>('matches');
+  const currentTournament = propTournament || localDataService.getActiveTournament();
+  const [activeTab, setActiveTab] = useState<
+    'matches' | 'generator' | 'teams' | 'players' | 'access' | 'import' | 'settings' | 'potm' | 'committee'
+  >('matches');
+
 
   // MATCH EDIT SCREEN STATE (One match = one edit screen)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -386,12 +402,16 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         </div>
 
         {/* Admin Tabs */}
-        <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-slate-100">
+        <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-slate-100 overflow-x-auto pb-1">
           {[
             { id: 'matches', label: 'Matches', icon: Calendar },
-            { id: 'players', label: 'Players', icon: Users },
+            { id: 'generator', label: 'Generator', icon: Wand2 },
             { id: 'teams', label: 'Clubs', icon: Shield },
-            { id: 'potm', label: 'POTM Polls', icon: Award },
+            { id: 'players', label: 'Players', icon: Users },
+            { id: 'access', label: 'Access Codes', icon: KeyRound },
+            { id: 'import', label: 'Bulk Import', icon: FileSpreadsheet },
+            { id: 'settings', label: 'Settings', icon: Settings },
+            { id: 'potm', label: 'POTM', icon: Award },
             { id: 'committee', label: 'Committee', icon: Phone },
           ].map(tab => {
             const Icon = tab.icon;
@@ -403,7 +423,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                   setSelectedMatch(null);
                   setActiveTab(tab.id as any);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 ${
                   isActive
                     ? 'bg-green-700 text-white'
                     : 'text-slate-600 hover:bg-slate-100'
@@ -416,6 +436,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
           })}
         </div>
       </div>
+
 
       {/* ================= TAB 1: MATCHES ================= */}
       {activeTab === 'matches' && (
@@ -888,10 +909,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
                 <button
                   onClick={() => {
                     setEditingTeam(team);
-                    setManagerInput(team.manager_name);
+                    setManagerInput(team.manager_name || '');
                   }}
                   className="px-2.5 py-1 border border-slate-200 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
+
                   Edit Manager
                 </button>
               </div>
@@ -1140,7 +1162,41 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         </div>
       )}
 
+      {/* ================= TAB 6: FIXTURE GENERATOR ================= */}
+      {activeTab === 'generator' && (
+        <FixtureGeneratorSection
+          tournament={currentTournament}
+          teams={teams}
+          existingMatches={matches}
+          onFixturesGenerated={onDataChanged}
+        />
+      )}
+
+      {/* ================= TAB 7: ACCESS CODES ================= */}
+      {activeTab === 'access' && (
+        <AccessCodesSection tournament={currentTournament} />
+      )}
+
+      {/* ================= TAB 8: BULK IMPORTS ================= */}
+      {activeTab === 'import' && (
+        <BulkImportSection
+          tournament={currentTournament}
+          teams={teams}
+          players={players}
+          onImportComplete={onDataChanged}
+        />
+      )}
+
+      {/* ================= TAB 9: TOURNAMENT SETTINGS ================= */}
+      {activeTab === 'settings' && (
+        <TournamentSettingsSection
+          tournament={currentTournament}
+          onTournamentUpdated={onDataChanged}
+        />
+      )}
+
       {/* MODAL: ADD / EDIT PLAYER */}
+
       {playerModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 border border-slate-200 shadow-xl space-y-3">

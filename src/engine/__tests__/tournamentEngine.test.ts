@@ -257,10 +257,11 @@ describe('Tournament Engine — Standings & Configurable Tie-Breakers', () => {
     // Configure Head-to-Head as primary tie-breaker after points
     const customRules = {
       ...DEFAULT_RULES_CONFIG,
-      tie_breaker_order: ['POINTS', 'HEAD_TO_HEAD', 'GOAL_DIFFERENCE'],
+      tie_breaker_order: ['POINTS', 'HEAD_TO_HEAD', 'GOAL_DIFFERENCE'] as const,
     };
 
-    const standings = calculateDeterministicStandings(tiedTeams, matches, customRules);
+    const standings = calculateDeterministicStandings(tiedTeams, matches, customRules as any);
+
     expect(standings).toHaveLength(3);
     // Every team has played 2 matches and has 3 points
     expect(standings.every(s => s.points === 3)).toBe(true);

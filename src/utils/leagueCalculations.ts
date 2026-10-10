@@ -33,7 +33,8 @@ export function calculateStandings(teams: Team[], matches: Match[]): TeamStandin
   // Sort matches by round and match_number to get accurate form sequence
   const completedMatches = matches
     .filter(m => m.status === 'COMPLETED' && m.home_score !== null && m.away_score !== null)
-    .sort((a, b) => a.round_number - b.round_number || a.match_number - b.match_number);
+    .sort((a, b) => (a.round_number || 0) - (b.round_number || 0) || a.match_number - b.match_number);
+
 
   completedMatches.forEach(match => {
     const home = standingsMap.get(match.home_team_id);

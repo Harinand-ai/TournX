@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Radio, Trophy, Play, ChevronDown } from 'lucide-react';
+import { Volume2, VolumeX, Radio, Trophy, Play, ChevronDown, KeyRound } from 'lucide-react';
 import { audioService } from '../services/audioService';
 
 interface NavbarProps {
@@ -10,7 +10,10 @@ interface NavbarProps {
   isAdminLoggedIn?: boolean;
   activeTournamentName?: string;
   onOpenTournamentSwitcher?: () => void;
+  onOpenAccessCode?: () => void;
+  sessionRole?: string;
 }
+
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
@@ -20,7 +23,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   isAdminLoggedIn,
   activeTournamentName,
   onOpenTournamentSwitcher,
+  onOpenAccessCode,
+  sessionRole,
 }) => {
+
   const [isMuted, setIsMuted] = useState<boolean>(audioService.getMuted());
 
   const navItems = [
@@ -126,6 +132,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
+            {/* Access Code entry / Role Badge */}
+            {onOpenAccessCode && (
+              <button
+                onClick={onOpenAccessCode}
+                title={sessionRole ? `Active session: ${sessionRole}` : "Enter Access Code"}
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black uppercase cursor-pointer ${
+                  sessionRole === 'SCORE'
+                    ? 'bg-emerald-600 text-white border border-emerald-400'
+                    : sessionRole === 'VIEW'
+                    ? 'bg-amber-600 text-white border border-amber-400'
+                    : 'mc-btn text-amber-300'
+                }`}
+              >
+                <KeyRound className="w-3 h-3 shrink-0" />
+                <span>{sessionRole || 'CODE'}</span>
+              </button>
+            )}
+
             {/* Admin shortcut badge if logged in */}
             {isAdminLoggedIn && (
               <button
@@ -136,6 +160,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
           </div>
+
 
         </div>
       </div>

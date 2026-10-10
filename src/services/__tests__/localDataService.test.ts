@@ -113,4 +113,38 @@ describe('LocalDataService — Multi-Tournament Isolation & Foundation', () => {
     expect(revoked?.is_active).toBe(false);
     expect(revoked?.revoked_at).not.toBeNull();
   });
+
+  it('verifies valid access codes and unlocks corresponding role', () => {
+    const { rawCode, code } = localDataService.generateAccessCode(
+      DEMO_TOURNAMENT_ID,
+      'SCORE',
+      'Scorer Official Key'
+    );
+
+    const verification = localDataService.verifyAccessCode(DEMO_TOURNAMENT_ID, rawCode);
+    expect(verification.success).toBe(true);
+    expect(verification.role).toBe('SCORE');
+
+    // Role is granted to session
+    expect(localDataService.getSessionRole(DEMO_TOURNAMENT_ID)).toBe('SCORE');
+
+    // Revoked code cannot be verified
+    localDataService.revokeAccessCode(DEMO_TOURNAMENT_ID, code.id);
+    const verificationRevoked = localDataService.verifyAccessCode(DEMO_TOURNAMENT_ID, rawCode);
+    expect(verificationRevoked.success).toBe(false);
+    expect(verificationRevoked.error).toContain('revoked');
+  });
+
+  it('rate-limits repeated invalid access code attempts', () => {
+    // 5 failed attempts
+    for (let i = 0; i < 5; i++) {
+      localDataService.verifyAccessCode(DEMO_TOURNAMENT_ID, `WRONG_${i}`);
+    }
+
+    // 6th attempt should trigger rate limiting error
+    const blocked = localDataService.verifyAccessCode(DEMO_TOURNAMENT_ID, 'ANOTHER_WRONG');
+    expect(blocked.success).toBe(false);
+    expect(blocked.error).toContain('Rate limit exceeded');
+  });
 });
+
