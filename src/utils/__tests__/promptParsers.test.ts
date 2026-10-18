@@ -236,6 +236,83 @@ describe('TournX Conversational Prompt Parsers', () => {
       expect(parsed.embeddedSquads?.totalPlayersParsed).toBeGreaterThanOrEqual(3);
       expect(parsed.embeddedSquads?.squads['Apex FC']?.managerName).toBe('Michael');
     });
+
+    // Benchmark Prompt and Variations
+    it('accurately parses benchmark prompt with misspellings, unformatted team names, venue and time', () => {
+      const prompt = 'teamnames crystal apalce,fulham,dotmund and spurs at college ground at 5 pm';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.teams).toEqual([
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ]);
+      expect(parsed.teamCount).toBe(4);
+      expect(parsed.venue).toBe('College Ground');
+      expect(parsed.startTime).toBe('5:00 PM');
+      // Tournament name is missing: clearly editable temporary default
+      expect(parsed.name).toBe('Draft Tournament');
+      // Start date is omitted: kept missing, never invented
+      expect(parsed.startDate).toBe('');
+      expect(parsed.startDateIso).toBeNull();
+      // Review warning list flags ONLY genuinely missing required fields
+      expect(parsed.missingFields).toContain('Tournament name');
+      expect(parsed.missingFields).toContain('Start date');
+      expect(parsed.missingFields).not.toContain('Venue / match location');
+      expect(parsed.missingFields).not.toContain('Team names (no team list detected)');
+      expect(parsed.missingFields).toHaveLength(2);
+    });
+
+    it('parses variation: "Four teams: Crystal Palace, Fulham, Dortmund and Spurs."', () => {
+      const prompt = 'Four teams: Crystal Palace, Fulham, Dortmund and Spurs.';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.teams).toEqual([
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ]);
+      expect(parsed.teamCount).toBe(4);
+    });
+
+    it('parses variation: "Play at college ground at 5 pm."', () => {
+      const prompt = 'Play at college ground at 5 pm.';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.venue).toBe('College Ground');
+      expect(parsed.startTime).toBe('5:00 PM');
+      // Time must not be treated as a date
+      expect(parsed.startDate).toBe('');
+      expect(parsed.startDateIso).toBeNull();
+    });
+
+    it('parses variation: "Start tomorrow at 5 in the evening."', () => {
+      const prompt = 'Four teams: Crystal Palace, Fulham, Dortmund and Spurs. Start tomorrow at 5 in the evening.';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.startDate).toBe('Tomorrow');
+      expect(parsed.startDateIso).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(parsed.startTime).toBe('5:00 PM');
+    });
+
+    it('parses variation: "A knockout tournament with these teams."', () => {
+      const prompt = 'A knockout tournament with these teams: Crystal Palace, Fulham, Dortmund and Spurs.';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.format).toBe('SINGLE_ELIMINATION');
+      expect(parsed.teams).toHaveLength(4);
+    });
+
+    it('parses variation: "League format, then the top two play the final."', () => {
+      const prompt = 'League format, then the top two play the final. Teams: Crystal Palace, Fulham, Dortmund and Spurs.';
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.format).toBe('LEAGUE_WITH_PLAYOFFS');
+      expect(parsed.playoffQualifiers).toBe(2);
+      expect(parsed.teams).toHaveLength(4);
+    });
   });
 
   describe('Squad & Player Parser', () => {

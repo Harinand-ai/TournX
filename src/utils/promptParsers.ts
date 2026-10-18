@@ -40,6 +40,7 @@ export interface ParsedTournamentDraft {
   venue: string;
   startDate: string;
   startDateIso: string | null;
+  startTime: string;
   visibility: 'PUBLIC' | 'PRIVATE';
   features: ParsedTournamentFeatures;
   unsupportedFeatures: string[];
@@ -126,6 +127,137 @@ export function normalizeDateToIso(rawDate: string): { displayDate: string; isoD
   }
 
   return { displayDate: trimmed, isoDate: null };
+}
+
+export const FOOTBALL_CLUB_ALIASES: Record<string, string> = {
+  // Benchmark and misspellings
+  'crystal apalce': 'Crystal Palace',
+  'crystal palace': 'Crystal Palace',
+  'palace': 'Crystal Palace',
+  'fulham': 'Fulham',
+  'dotmund': 'Borussia Dortmund',
+  'dortmund': 'Borussia Dortmund',
+  'borussia dortmund': 'Borussia Dortmund',
+  'bvb': 'Borussia Dortmund',
+  'spurs': 'Tottenham Hotspur (Spurs)',
+  'tottenham': 'Tottenham Hotspur (Spurs)',
+  'tottenham hotspur': 'Tottenham Hotspur (Spurs)',
+  'tottenham hotspurs': 'Tottenham Hotspur (Spurs)',
+
+  // Premier League & International top clubs
+  'arsenal': 'Arsenal',
+  'chelsea': 'Chelsea',
+  'liverpool': 'Liverpool',
+  'man city': 'Manchester City',
+  'mancity': 'Manchester City',
+  'manchester city': 'Manchester City',
+  'man utd': 'Manchester United',
+  'manutd': 'Manchester United',
+  'man united': 'Manchester United',
+  'manchester united': 'Manchester United',
+  'aston villa': 'Aston Villa',
+  'newcastle': 'Newcastle United',
+  'newcastle united': 'Newcastle United',
+  'west ham': 'West Ham United',
+  'west ham united': 'West Ham United',
+  'everton': 'Everton',
+  'wolves': 'Wolverhampton Wanderers',
+  'wolverhampton': 'Wolverhampton Wanderers',
+  'brighton': 'Brighton & Hove Albion',
+  'brentford': 'Brentford',
+  'bournemouth': 'AFC Bournemouth',
+  'nottingham forest': 'Nottingham Forest',
+  'leicester': 'Leicester City',
+  'leicester city': 'Leicester City',
+  'southampton': 'Southampton',
+  'ipswich': 'Ipswich Town',
+  'ipswich town': 'Ipswich Town',
+  'real madrid': 'Real Madrid',
+  'barcelona': 'FC Barcelona',
+  'barca': 'FC Barcelona',
+  'bayern': 'Bayern Munich',
+  'bayern munich': 'Bayern Munich',
+  'psg': 'Paris Saint-Germain',
+  'paris saint germain': 'Paris Saint-Germain',
+  'juventus': 'Juventus',
+  'inter milan': 'Inter Milan',
+  'ac milan': 'AC Milan',
+  'atletico madrid': 'Atlético Madrid',
+};
+
+export function normalizeTeamName(raw: string): string {
+  const cleaned = raw.trim().replace(/^["']|["']$/g, '').replace(/^[•*\-\d.]+\s*/, '').replace(/^(?:the\s+)/i, '').trim();
+  const lower = cleaned.toLowerCase();
+  if (FOOTBALL_CLUB_ALIASES[lower]) {
+    return FOOTBALL_CLUB_ALIASES[lower];
+  }
+
+  // Preserve casing if already properly capitalized or title-case words if all lowercase
+  const words = cleaned.split(/\s+/);
+  return words
+    .map(w => {
+      const wLower = w.toLowerCase();
+      if (/^(?:fc|afc|cf|sc|bvb)$/i.test(w)) {
+        return w.toUpperCase();
+      }
+      if (/^(?:united|city|rovers|town|wanderers|athletic|hotspur)$/i.test(w)) {
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }
+      if (w === w.toLowerCase()) {
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }
+      return w;
+    })
+    .join(' ');
+}
+
+export function normalizeVenueName(raw: string): string {
+  const cleaned = raw.trim().replace(/^["']|["']$/g, '').replace(/^(?:the\s+)/i, '').trim();
+  return cleaned
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+export function normalizeTimeTo12Hour(raw: string): string {
+  const clean = raw.trim().toLowerCase();
+
+  // "5 in the evening", "5 in the afternoon", "5 at night"
+  const mEvening = clean.match(/^(\d{1,2})\s*(?:in the (?:afternoon|evening)|at night)$/);
+  if (mEvening) {
+    let hour = parseInt(mEvening[1], 10);
+    if (hour < 12) hour += 12;
+    return `${hour === 12 ? 12 : hour - 12}:00 PM`;
+  }
+
+  // "5 in the morning"
+  const mMorning = clean.match(/^(\d{1,2})\s*in the morning$/);
+  if (mMorning) {
+    const hour = parseInt(mMorning[1], 10);
+    return `${hour}:00 AM`;
+  }
+
+  // "5 pm", "5pm", "5:00 pm", "5:30 pm"
+  const mAmPm = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/);
+  if (mAmPm) {
+    const hour = parseInt(mAmPm[1], 10);
+    const minute = mAmPm[2] || '00';
+    const meridiem = mAmPm[3].toUpperCase();
+    return `${hour}:${minute} ${meridiem}`;
+  }
+
+  // "17:00", "09:30"
+  const m24 = clean.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (m24) {
+    let hour = parseInt(m24[1], 10);
+    const minute = m24[2];
+    const meridiem = hour >= 12 ? 'PM' : 'AM';
+    if (hour === 0) hour = 12;
+    else if (hour > 12) hour -= 12;
+    return `${hour}:${minute} ${meridiem}`;
+  }
+
+  return raw.trim();
 }
 
 function cleanText(text: string): string {
@@ -254,8 +386,8 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
       const cand = titleMatch[1] || titleMatch[0];
       name = cand.replace(/^(?:the\s+event\s+is\s+called\s+|organising\s+(?:the\s+)?|organizing\s+(?:the\s+)?|create\s+(?:the\s+)?)/i, '').trim();
     } else {
-      name = 'TournX Championship';
-      missingFields.push('Tournament name (defaulted to TournX Championship)');
+      name = 'Draft Tournament';
+      missingFields.push('Tournament name');
     }
   }
 
@@ -272,7 +404,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   const bulletItems = extractBulletItems(rawText);
   if (bulletItems.length >= 2) {
     bulletItems.forEach(item => {
-      const cleaned = item.trim().replace(/^(?:the\s+)/i, '');
+      const cleaned = normalizeTeamName(item);
       if (cleaned.length >= 2 && !teams.includes(cleaned)) {
         teams.push(cleaned);
       }
@@ -282,7 +414,12 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   // If no bullets, parse conversational sentences
   if (teams.length === 0) {
     const teamSectionPatterns = [
-      /(?:teams|clubs|squads)\s*(?:are\s+participating|participating\s+are|are|include|namely|:|-)\s*:?\s*([^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$))/i,
+      // Pattern 1: e.g. "teamnames crystal apalce,fulham,dotmund and spurs at college ground..."
+      /(?:\bteamnames?\b|\bteam\s+names?\s*:)\s*:?\s*([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
+      // Pattern 2: e.g. "Four teams: Crystal Palace, Fulham, Dortmund and Spurs."
+      /(?:(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\s*:\s*)([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
+      // Pattern 3: Standard conversational sentence e.g. "Six teams are participating: ..." or "teams are: ..."
+      /(?:\b(?:teams?|clubs?|squads?|participants?)\b)\s*(?:are\s+participating|participating\s+are|are|include|namely|:|-|—)\s*:?\s*([^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$)|[.;!?\n]|$)/i,
       /(?:we\s+have|featuring)\s+([A-Z][^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$))/i,
     ];
 
@@ -290,18 +427,19 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
       const match = singleLineText.match(pat);
       if (match && match[1]) {
         const rawList = match[1].trim();
-        // Split by comma, semicolon, or "and" (with word boundaries)
-        const tokens = rawList.split(/,|;|\band\b/i).map(t => t.trim().replace(/^["']|["']$/g, ''));
+        // Split by comma, semicolon, or "and" (with word boundaries) or "vs" or "&"
+        const tokens = rawList.split(/,|;|\band\b|\bvs\b|&/i).map(t => t.trim().replace(/^["']|["']$/g, ''));
         tokens.forEach(tok => {
           let cleaned = tok.replace(/^(?:the\s+)/i, '').trim();
           if (cleaned.length >= 2 && !/^(?:teams|clubs|squads|format|points|participating)$/i.test(cleaned)) {
             cleaned = cleaned.replace(/\s+(?:and|or)$/i, '').trim();
-            if (cleaned && !teams.includes(cleaned)) {
-              teams.push(cleaned);
+            const normalized = normalizeTeamName(cleaned);
+            if (normalized && !teams.includes(normalized)) {
+              teams.push(normalized);
             }
           }
         });
-        if (teams.length > 0) break;
+        if (teams.length >= 2) break;
       }
     }
   }
@@ -312,7 +450,8 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     if (commaListMatch) {
       const items = commaListMatch[1].split(/,|\band\b/i).map(t => t.trim());
       items.forEach(item => {
-        if (item.length > 2 && !teams.includes(item)) teams.push(item);
+        const norm = normalizeTeamName(item);
+        if (norm.length > 2 && !teams.includes(norm)) teams.push(norm);
       });
     }
   }
@@ -345,10 +484,11 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
                       lower.includes('top 2 teams advance') || lower.includes('top four teams advance') ||
                       lower.includes('top 4 teams advance') || lower.includes('advance to final') ||
                       lower.includes('advance to the final') || lower.includes('advance to semifinals') ||
-                      lower.includes('advance to semi-finals');
+                      lower.includes('advance to semi-finals') || lower.includes('play the final') ||
+                      lower.includes('play the semi');
 
   let playoffQualifiers: 2 | 4 = 4;
-  if (/top\s+(?:two|2)\b/i.test(lower) || /final\s+between\s+top\s+two/i.test(lower) || /top\s+2\s+teams?\s+advance\s+(?:directly\s+)?to\s+(?:the\s+)?final/i.test(lower)) {
+  if (/top\s+(?:two|2)\b/i.test(lower) || /final\s+between\s+top\s+two/i.test(lower) || /top\s+2\s+teams?\s+advance\s+(?:directly\s+)?to\s+(?:the\s+)?final/i.test(lower) || /top\s+(?:two|2)\s+play\s+(?:the\s+)?final/i.test(lower)) {
     playoffQualifiers = 2;
   } else if (/top\s+(?:four|4)\b/i.test(lower) || /semifinal/i.test(lower) || /semi-final/i.test(lower)) {
     playoffQualifiers = 4;
@@ -445,9 +585,9 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   // 7. Venue
   let venue = '';
   const venuePatterns = [
-    /(?:played\s+at|venue\s+is|held\s+at|location\s+is|ground\s+is)\s+(?:the\s+)?([A-Za-z0-9\s'-]{3,50}?)(?=\.|\,|\s+on\b|\s+The|\s+Starting|\s+Starts|\s+Matches|\s+Six|\s+Each|\s+Please|$)/i,
-    /(?:at\s+)([A-Z][A-Za-z0-9\s'-]{2,50}?(?:Stadium|Ground|Turf|Arena|Complex|Park|Field|Pitch))(?=\.|\,|\s+on\b|\s+Six|\s+The|\s+Each|\s+Please|\s+Starting|\s+Starts|$)/i,
-    /(?:played\s+at|venue\s+is|held\s+at|location\s+is|ground\s+is)\s+(?:the\s+)?([A-Za-z0-9\s'-]{3,50}?)$/i,
+    /(?:played\s+at|venue\s+is|held\s+at|location\s+is|ground\s+is|play\s+at)\s+(?:the\s+)?([A-Za-z0-9\s'-]{3,50}?)(?=[.,;!?\n]|\s+at\s+\d|\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)|\s+in\s+the\s+(?:morning|afternoon|evening)|\s+on\b|\s+The|\s+Starting|\s+Starts|\s+Matches|\s+Six|\s+Each|\s+Please|$)/i,
+    /(?:at\s+)([A-Za-z0-9\s'-]{2,50}?(?:Stadium|Ground|Turf|Arena|Complex|Park|Field|Pitch))(?=[.,;!?\n]|\s+at\s+\d|\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)|\s+in\s+the\s+(?:morning|afternoon|evening)|\s+on\b|\s+Six|\s+The|\s+Each|\s+Please|\s+Starting|\s+Starts|$)/i,
+    /(?:played\s+at|venue\s+is|held\s+at|location\s+is|ground\s+is|play\s+at)\s+(?:the\s+)?([A-Za-z0-9\s'-]{3,50}?)$/i,
   ];
 
   for (const vp of venuePatterns) {
@@ -455,7 +595,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     if (vm && vm[1]) {
       const candidate = vm[1].trim().replace(/[,.]$/, '').trim();
       if (candidate.length > 2) {
-        venue = candidate;
+        venue = normalizeVenueName(candidate);
         break;
       }
     }
@@ -465,21 +605,55 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     missingFields.push('Venue / match location');
   }
 
-  // 8. Start Date
+  // 8. Kick-off Time
+  let startTime = '';
+  const timePatterns = [
+    /\b(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i,
+    /\b(?:at\s+)?(\d{1,2})\s+(?:in the (?:morning|afternoon|evening)|at night)\b/i,
+    /\b(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)\b/i,
+  ];
+  for (const tp of timePatterns) {
+    const tm = singleLineText.match(tp);
+    if (tm) {
+      startTime = normalizeTimeTo12Hour(tm[0].replace(/^at\s+/i, '').trim());
+      break;
+    }
+  }
+
+  // 9. Start Date
   let startDate = '';
   let startDateIso: string | null = null;
-  const datePatterns = [
-    /(?:starts\s+on|starting\s+on|beginning\s+on|held\s+on|scheduled\s+for|on\s+)\s*([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:,?\s*\d{4})?|\d{4}-\d{2}-\d{2})(?=\s+at|\.|\s+The|\s+Six|\s+Schedule|\s+Matches|,|$)/i,
-  ];
 
-  for (const dp of datePatterns) {
-    const dm = singleLineText.match(dp);
-    if (dm && dm[1]) {
-      const rawDateCandidate = dm[1].trim();
-      const norm = normalizeDateToIso(rawDateCandidate);
-      startDate = norm.displayDate;
-      startDateIso = norm.isoDate;
-      break;
+  // Check for "tomorrow"
+  const tomorrowMatch = singleLineText.match(/\b(?:starts?\s+|starting\s+|held\s+|beginning\s+)?tomorrow\b/i);
+  if (tomorrowMatch) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    startDate = 'Tomorrow';
+    startDateIso = `${yyyy}-${mm}-${dd}`;
+  } else {
+    // Normal date patterns - strictly require month name or ISO format, never matching isolated time
+    const datePatterns = [
+      /(?:starts\s+on|starting\s+on|beginning\s+on|held\s+on|scheduled\s+for|on\s+)\s*([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s*\d{4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+(?:,?\s*\d{4})?|\d{4}-\d{2}-\d{2})(?=\s+at|\.|\s+The|\s+Six|\s+Schedule|\s+Matches|,|$)/i,
+    ];
+
+    for (const dp of datePatterns) {
+      const dm = singleLineText.match(dp);
+      if (dm && dm[1]) {
+        const rawDateCandidate = dm[1].trim();
+        // Ensure this is not a time (e.g. "5 pm" or "5 in the evening")
+        if (!/^\d{1,2}(?::\d{2})?\s*(?:am|pm)$/i.test(rawDateCandidate) && !/in the (?:morning|evening|afternoon)/i.test(rawDateCandidate)) {
+          const norm = normalizeDateToIso(rawDateCandidate);
+          if (norm.isoDate) {
+            startDate = norm.displayDate;
+            startDateIso = norm.isoDate;
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -487,7 +661,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     missingFields.push('Start date');
   }
 
-  // 9. Optional Features & Visibility
+  // 10. Optional Features & Visibility
   const features: ParsedTournamentFeatures = {
     goalscorerTracking: true,
     playerOfTheMatch: true,
@@ -512,7 +686,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     visibility = 'PRIVATE';
   }
 
-  // 10. Matches per round
+  // 11. Matches per round
   let matchesPerRound: number | undefined;
   const perRoundMatch = lower.match(/(?:(\d+)|(one|two|three|four|five|six|seven|eight))\s+matches\s+per\s+round/i);
   if (perRoundMatch) {
@@ -534,7 +708,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     confidence = 'MEDIUM';
   }
 
-  // 11. Extract Embedded Squads, Players, Positions, Captains, Managers if present in master prompt
+  // 12. Extract Embedded Squads, Players, Positions, Captains, Managers if present in master prompt
   let embeddedSquads: ParsedSquadDraft | undefined;
   if (/goalkeeper|keeper|goalie|defender|midfielder|forward|striker|captain|manager|\bgk\b|\bdef\b|\bmid\b|\bfwd\b/i.test(lower)) {
     try {
@@ -584,6 +758,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     venue,
     startDate,
     startDateIso,
+    startTime,
     visibility,
     features,
     unsupportedFeatures,

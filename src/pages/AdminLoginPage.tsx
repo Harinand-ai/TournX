@@ -222,6 +222,42 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
         </div>
       )}
 
+      {/* Sign in / Sign up Tab Switcher */}
+      {isSupabaseConfigured && (
+        <div className="flex border-b border-slate-200 mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(false);
+              setErrorMsg('');
+              setInfoMsg('');
+            }}
+            className={`flex-1 pb-2.5 text-xs font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
+              !isSignUp
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(true);
+              setErrorMsg('');
+              setInfoMsg('');
+            }}
+            className={`flex-1 pb-2.5 text-xs font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
+              isSignUp
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Sign Up
+          </button>
+        </div>
+      )}
+
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -290,16 +326,18 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
           </div>
         )}
 
-        <div className="pt-2 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-slate-200 flex items-center justify-center gap-1.5"
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Local Demo Admin Sign-In</span>
-          </button>
-        </div>
+        {!isSupabaseConfigured && (
+          <div className="pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={handleQuickDemoLogin}
+              className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-slate-200 flex items-center justify-center gap-1.5"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Local Demo Admin Sign-In</span>
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );

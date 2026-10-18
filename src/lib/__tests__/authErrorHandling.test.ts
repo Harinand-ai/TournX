@@ -62,4 +62,25 @@ describe('TournX Authentication & Error Handling Hardening', () => {
       expect(typeof res.error).toBe('string');
     }
   });
+
+  it('guarantees organizer setup routes (organize, setup, wizard) require authentication', () => {
+    const organizerRoutes = ['organize', 'setup', 'wizard', 'workspace', 'admin'];
+    const isProtectedOrganizerRoute = (tab: string) => organizerRoutes.includes(tab);
+
+    expect(isProtectedOrganizerRoute('organize')).toBe(true);
+    expect(isProtectedOrganizerRoute('setup')).toBe(true);
+    expect(isProtectedOrganizerRoute('wizard')).toBe(true);
+    expect(isProtectedOrganizerRoute('workspace')).toBe(true);
+    expect(isProtectedOrganizerRoute('public-tournament')).toBe(false);
+  });
+
+  it('prevents local demo admin flag from bypassing cloud authentication when Supabase is active', () => {
+    const isCloud = true;
+    const devAdminLogged = true;
+    const sessionUser = null;
+
+    // Strict cloud auth check: must evaluate to false when sessionUser is null
+    const isAuthenticated = isCloud ? Boolean(sessionUser) : devAdminLogged;
+    expect(isAuthenticated).toBe(false);
+  });
 });

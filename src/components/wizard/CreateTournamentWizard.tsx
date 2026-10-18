@@ -575,7 +575,7 @@ export function CreateTournamentWizard({
           home_team_id: gm.home_team_id ? teamIndexToId[gm.home_team_id] || '' : '',
           away_team_id: gm.away_team_id ? teamIndexToId[gm.away_team_id] || '' : '',
           scheduled_date: tournamentDraft.startDateIso || null,
-          scheduled_time: null,
+          scheduled_time: tournamentDraft.startTime || null,
           venue: tournamentDraft.venue || 'Kannur Municipal Stadium',
           home_score: null,
           away_score: null,
@@ -973,6 +973,25 @@ export function CreateTournamentWizard({
                       <span className="font-semibold text-slate-900">
                         {tournamentDraft.startDate || 'Not specified'}
                         {tournamentDraft.startDateIso ? ` (${tournamentDraft.startDateIso})` : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Kick-off Time:
+                    </span>
+                    {manualEditDraft ? (
+                      <input
+                        type="text"
+                        value={tournamentDraft.startTime || ''}
+                        onChange={(e) => setTournamentDraft({ ...tournamentDraft, startTime: e.target.value })}
+                        placeholder="e.g. 5:00 PM"
+                        className="w-32 px-2 py-0.5 rounded bg-white border border-slate-300 text-slate-900 text-right"
+                      />
+                    ) : (
+                      <span className="font-semibold text-slate-900">
+                        {tournamentDraft.startTime || 'Not specified'}
                       </span>
                     )}
                   </div>

@@ -167,6 +167,7 @@ export function App() {
   // Admin auth & session state
   const [isAuthLoading] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    if (isSupabaseConfigured) return false;
     return localDataService.isDevAdminLoggedIn();
   });
 
@@ -262,7 +263,7 @@ export function App() {
           setIsAdminLoggedIn(true);
           setCurrentUserId(session.user.id);
         } else {
-          setIsAdminLoggedIn(localDataService.isDevAdminLoggedIn());
+          setIsAdminLoggedIn(isSupabaseConfigured ? false : localDataService.isDevAdminLoggedIn());
           setCurrentUserId(null);
         }
       });
@@ -517,17 +518,23 @@ export function App() {
       case 'setup':
       case 'wizard':
         return (
-          <CreateTournamentWizard
-            initialData={wizardInitialData}
-            onComplete={(newTourney) => {
-              localDataService.registerTournament(newTourney);
-              localDataService.setActiveTournamentId(newTourney.id);
-              setActiveTournament(newTourney);
-              handleTournamentChanged(newTourney.id);
-              handleNavigate('workspace');
-            }}
-            onCancel={() => handleNavigate('landing')}
-          />
+          <AdminAuthGuard
+            isLoading={isAuthLoading}
+            isAuthenticated={isAdminLoggedIn}
+            onRedirectToLogin={() => handleNavigate('admin/login')}
+          >
+            <CreateTournamentWizard
+              initialData={wizardInitialData}
+              onComplete={(newTourney) => {
+                localDataService.registerTournament(newTourney);
+                localDataService.setActiveTournamentId(newTourney.id);
+                setActiveTournament(newTourney);
+                handleTournamentChanged(newTourney.id);
+                handleNavigate('workspace');
+              }}
+              onCancel={() => handleNavigate('landing')}
+            />
+          </AdminAuthGuard>
         );
 
       case 'workspace':

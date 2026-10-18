@@ -110,8 +110,10 @@ export function LandingPage({
         }
 
         if (data.session) {
-          // Immediately authenticated (email auto-confirm is enabled in Supabase dev)
-          localDataService.setDevAdminLoggedIn(true);
+          // Immediately authenticated
+          if (!isSupabaseConfigured) {
+            localDataService.setDevAdminLoggedIn(true);
+          }
           onOrganizeClick({
             name: tournamentName.trim(),
             description: tournamentDescription.trim(),
@@ -130,11 +132,12 @@ export function LandingPage({
 
           // New account with email confirmation required by Supabase project settings
           setConfirmationNotice(
-            `A confirmation email has been sent to ${cleanEmail}. Please verify your email to activate your account, then sign in below.`
+            `Registration successful! A verification email has been sent to ${cleanEmail}. Please verify your email to activate your account, then sign in below.`
           );
           setAuthMode('SIGN_IN');
           return;
         }
+        throw new Error('Registration failed. Please try again.');
       }
 
       // Offline / Local synthetic mode fallback
@@ -205,10 +208,13 @@ export function LandingPage({
         }
 
         if (data.user) {
-          localDataService.setDevAdminLoggedIn(true);
+          if (!isSupabaseConfigured) {
+            localDataService.setDevAdminLoggedIn(true);
+          }
           onOrganizeClick();
           return;
         }
+        throw new Error('Sign in failed. No user session returned.');
       }
 
       // Offline fallback login check
@@ -608,20 +614,22 @@ export function LandingPage({
                   </form>
                 )}
 
-                {/* Instant Demo Sandbox Shortcut */}
-                <div className="mt-6 pt-4 border-t border-slate-200 text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localDataService.setDevAdminLoggedIn(true);
-                      onOrganizeClick();
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-700 transition cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Open local organizer demo without creating an account</span>
-                  </button>
-                </div>
+                {/* Instant Demo Sandbox Shortcut (local development only) */}
+                {!isSupabaseConfigured && (
+                  <div className="mt-6 pt-4 border-t border-slate-200 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localDataService.setDevAdminLoggedIn(true);
+                        onOrganizeClick();
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-700 transition cursor-pointer"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Open local organizer demo without creating an account</span>
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
 
