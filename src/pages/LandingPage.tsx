@@ -14,7 +14,7 @@ import {
   UserPlus,
   Play
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getSupabaseProjectHost, resendConfirmationEmail } from '../lib/supabase';
 import { localDataService } from '../services/localDataService';
 import { Tournament } from '../types/multiTenant';
 
@@ -36,10 +36,10 @@ export function LandingPage({
   // Main Tab: 'ORGANIZE' | 'JOIN'
   const [activeAction, setActiveAction] = useState<'ORGANIZE' | 'JOIN'>('ORGANIZE');
 
-  // Organizer Auth Mode: 'SIGN_IN' | 'SIGN_UP'
-  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP'>('SIGN_UP');
+  // Organizer Auth Mode: Default to 'SIGN_IN' for existing organizers
+  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP'>('SIGN_IN');
 
-  // Sign up fields
+  // Sign up / Sign in fields
   const [organizerName, setOrganizerName] = useState('');
   const [organizerEmail, setOrganizerEmail] = useState('');
   const [organizerPassword, setOrganizerPassword] = useState('');
@@ -56,14 +56,21 @@ export function LandingPage({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
+  const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
 
   // Handle Organizer Sign Up
   const handleOrganizerSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setConfirmationNotice(null);
+    setIsUnconfirmedError(false);
+    setResendStatus(null);
 
-    if (!organizerEmail.trim() || !organizerPassword.trim()) {
+    const cleanEmail = organizerEmail.trim().toLowerCase();
+
+    if (!cleanEmail || !organizerPassword.trim()) {
       setErrorMessage('Please provide an email address and password.');
       return;
     }
@@ -84,7 +91,7 @@ export function LandingPage({
       if (isSupabaseConfigured && supabase) {
         // Real Supabase Auth registration
         const { data, error } = await supabase.auth.signUp({
-          email: organizerEmail.trim(),
+          email: cleanEmail,
           password: organizerPassword,
           options: {
             data: {
@@ -94,6 +101,11 @@ export function LandingPage({
         });
 
         if (error) {
+          console.error('[TournX Organizer SignUp Error]', {
+            code: (error as any).code,
+            status: (error as any).status,
+            message: error.message
+          });
           throw new Error(error.message);
         }
 
@@ -107,9 +119,18 @@ export function LandingPage({
           });
           return;
         } else if (data.user && !data.session) {
-          // Email confirmation is required by Supabase project settings
+          // Check if this email already exists in Supabase (identities array is empty)
+          if (data.user.identities && data.user.identities.length === 0) {
+            setConfirmationNotice(
+              `An account with ${cleanEmail} already exists. Please sign in below with your password.`
+            );
+            setAuthMode('SIGN_IN');
+            return;
+          }
+
+          // New account with email confirmation required by Supabase project settings
           setConfirmationNotice(
-            `A confirmation email has been sent to ${organizerEmail}. Please verify your email to activate your account, then sign in below.`
+            `A confirmation email has been sent to ${cleanEmail}. Please verify your email to activate your account, then sign in below.`
           );
           setAuthMode('SIGN_IN');
           return;
@@ -135,8 +156,12 @@ export function LandingPage({
     e.preventDefault();
     setErrorMessage(null);
     setConfirmationNotice(null);
+    setIsUnconfirmedError(false);
+    setResendStatus(null);
 
-    if (!organizerEmail.trim() || !organizerPassword.trim()) {
+    const cleanEmail = organizerEmail.trim().toLowerCase();
+
+    if (!cleanEmail || !organizerPassword.trim()) {
       setErrorMessage('Please enter both your email address and password.');
       return;
     }
@@ -146,11 +171,36 @@ export function LandingPage({
     try {
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: organizerEmail.trim(),
+          email: cleanEmail,
           password: organizerPassword,
         });
 
         if (error) {
+          console.error('[TournX Organizer SignIn Error]', {
+            code: (error as any).code,
+            status: (error as any).status,
+            message: error.message,
+            targetHost: getSupabaseProjectHost()
+          });
+
+          const isUnconfirmed = 
+            (error as any).code === 'email_not_confirmed' ||
+            error.message.toLowerCase().includes('email not confirmed');
+
+          if (isUnconfirmed) {
+            setIsUnconfirmedError(true);
+            const projectHost = getSupabaseProjectHost();
+            setErrorMessage(
+              `Email not confirmed for ${cleanEmail} on ${projectHost || 'Supabase'}. If you confirmed this account previously or signed in earlier, ensure you are using the correct credentials and project. If you need a new confirmation email, click below.`
+            );
+            return;
+          }
+
+          if ((error as any).code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) {
+            setErrorMessage('Invalid email or password. Please verify your credentials and check caps lock.');
+            return;
+          }
+
           throw new Error(error.message);
         }
 
@@ -168,6 +218,29 @@ export function LandingPage({
       setErrorMessage(err.message || 'Invalid email or password.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle Resend Confirmation Email
+  const handleResendConfirmation = async () => {
+    const cleanEmail = organizerEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your email address to resend confirmation.');
+      return;
+    }
+    setIsResending(true);
+    setResendStatus(null);
+    try {
+      const res = await resendConfirmationEmail(cleanEmail);
+      if (res.success) {
+        setResendStatus(`Confirmation email resent to ${cleanEmail}. Please check your inbox and spam folder.`);
+      } else {
+        setErrorMessage(res.error || 'Failed to resend confirmation email.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error resending confirmation.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -304,10 +377,32 @@ export function LandingPage({
             </div>
           )}
 
+          {resendStatus && (
+            <div className="mb-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2.5">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>{resendStatus}</span>
+            </div>
+          )}
+
           {errorMessage && (
-            <div className="mb-5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
+            <div className="mb-5 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex flex-col gap-2.5">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="flex-1">{errorMessage}</span>
+              </div>
+              {isUnconfirmedError && (
+                <div className="pt-2 border-t border-rose-200 flex items-center justify-between">
+                  <span className="text-[11px] text-rose-700">Need a verification link?</span>
+                  <button
+                    type="button"
+                    onClick={handleResendConfirmation}
+                    disabled={isResending}
+                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isResending ? 'Sending...' : 'Resend Confirmation Email'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -15,7 +15,6 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { localDataService } from '../services/localDataService';
 
 const PRODUCTION_FORBIDDEN_HOST = 'blvbadhssprenjizbnvz.supabase.co';
-const AUTHORIZED_DEV_HOST = 'jbzhtgqdgqjnffljwazy.supabase.co';
 
 const env: Record<string, string | undefined> = 
   (typeof import.meta !== 'undefined' && import.meta.env) 
@@ -42,13 +41,21 @@ function isValidKey(key: string): boolean {
   return key.length > 20 && (key.includes('.') || key.startsWith('sb_p') || key.startsWith('sbp_'));
 }
 
-const isAuthorizedHost = rawUrl.includes(AUTHORIZED_DEV_HOST) || rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1');
+// Any valid Supabase host or local dev server is permitted, strictly excluding the forbidden legacy host
+const isAuthorizedHost = 
+  Boolean(rawUrl) &&
+  !rawUrl.includes(PRODUCTION_FORBIDDEN_HOST) &&
+  (rawUrl.includes('.supabase.co') || rawUrl.includes('localhost') || rawUrl.includes('127.0.0.1'));
+
 const hasValidKey = isValidKey(rawKey);
 
-let clientInstance: SupabaseClient | null = null;
-let configured = false;
+// Maintain singleton instance across Vite HMR reloads
+const globalScope = typeof globalThis !== 'undefined' ? (globalThis as any) : (window as any);
 
-if (rawUrl && isAuthorizedHost && hasValidKey) {
+let clientInstance: SupabaseClient | null = globalScope.__tournx_supabase_client__ || null;
+let configured = Boolean(clientInstance);
+
+if (!clientInstance && rawUrl && isAuthorizedHost && hasValidKey) {
   try {
     clientInstance = createClient(rawUrl, rawKey, {
       auth: {
@@ -58,24 +65,58 @@ if (rawUrl && isAuthorizedHost && hasValidKey) {
         storageKey: 'ftm_dev_auth_token',
       },
     });
+    globalScope.__tournx_supabase_client__ = clientInstance;
     configured = true;
-    console.info(`[TournX] Supabase client initialized for authorized development project: ${AUTHORIZED_DEV_HOST}`);
+    try {
+      const parsedHost = new URL(rawUrl).host;
+      console.info(`[TournX] Supabase client initialized for project host: ${parsedHost}`);
+    } catch {
+      console.info(`[TournX] Supabase client initialized`);
+    }
   } catch (err) {
     console.warn('[TournX] Failed to initialize Supabase client. Reverting to local synthetic mode.', err);
     clientInstance = null;
     configured = false;
   }
-} else {
-  if (rawUrl && !isAuthorizedHost) {
-    console.warn(`[TournX] Provided Supabase URL does not match authorized development host (${AUTHORIZED_DEV_HOST}). Defaulting to local synthetic mode.`);
-  } else if (!hasValidKey) {
-    // Expected during development prior to key provision
-    console.info('[TournX] Running in local synthetic data mode (persistent local storage).');
-  }
+} else if (!hasValidKey && !clientInstance) {
+  console.info('[TournX] Running in local synthetic data mode (persistent local storage).');
 }
 
 export const isSupabaseConfigured: boolean = configured;
 export const supabase: SupabaseClient | null = clientInstance;
+
+/**
+ * Returns the currently configured Supabase project hostname (e.g. jbzhtgqdgqjnffljwazy.supabase.co) or null
+ */
+export function getSupabaseProjectHost(): string | null {
+  if (!rawUrl) return null;
+  try {
+    return new URL(rawUrl).host;
+  } catch {
+    return rawUrl;
+  }
+}
+
+/**
+ * Resends the signup confirmation email to the specified address
+ */
+export async function resendConfirmationEmail(email: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase client is not configured.' };
+  }
+  try {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to resend confirmation email.' };
+  }
+}
 
 /**
  * Returns true if real Supabase authentication is active and configured

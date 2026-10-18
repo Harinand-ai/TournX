@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, AlertCircle, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
 import { localDataService } from '../services/localDataService';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase, getSupabaseProjectHost, resendConfirmationEmail } from '../lib/supabase';
 
 interface AdminLoginPageProps {
   onLoginSuccess: () => void;
@@ -18,39 +18,82 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
+  const [isResending, setIsResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setInfoMsg('');
+    setIsUnconfirmedError(false);
     setLoading(true);
+
+    const cleanEmail = email.trim().toLowerCase();
 
     try {
       if (isSupabaseConfigured && supabase) {
         // Real Supabase Authentication (Phase Five)
         if (isSignUp) {
           const { data, error } = await supabase.auth.signUp({
-            email: email.trim(),
+            email: cleanEmail,
             password,
           });
-          if (error) throw error;
+          if (error) {
+            console.error('[TournX Admin SignUp Error]', {
+              code: (error as any).code,
+              status: (error as any).status,
+              message: error.message
+            });
+            throw error;
+          }
           if (data.session) {
             onLoginSuccess();
           } else {
-            setInfoMsg('Registration successful! Please check your email for confirmation or sign in.');
-            setIsSignUp(false);
+            if (data.user && data.user.identities && data.user.identities.length === 0) {
+              setInfoMsg(`An account with ${cleanEmail} already exists. Please sign in below with your password.`);
+              setIsSignUp(false);
+            } else {
+              setInfoMsg(`Registration successful! A confirmation email has been sent to ${cleanEmail}. Please check your inbox, then sign in.`);
+              setIsSignUp(false);
+            }
           }
         } else {
           const { error } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
+            email: cleanEmail,
             password,
           });
-          if (error) throw error;
+          if (error) {
+            console.error('[TournX Admin SignIn Error]', {
+              code: (error as any).code,
+              status: (error as any).status,
+              message: error.message,
+              targetHost: getSupabaseProjectHost()
+            });
+
+            const isUnconfirmed = 
+              (error as any).code === 'email_not_confirmed' ||
+              error.message.toLowerCase().includes('email not confirmed');
+
+            if (isUnconfirmed) {
+              setIsUnconfirmedError(true);
+              const projectHost = getSupabaseProjectHost();
+              setErrorMsg(
+                `Email not confirmed for ${cleanEmail} on ${projectHost || 'Supabase'}. If you confirmed this account previously or signed in earlier, ensure you are using the correct credentials and project. If you need a new confirmation email, click below.`
+              );
+              return;
+            }
+
+            if ((error as any).code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) {
+              setErrorMsg('Invalid email or password. Please verify your credentials and check caps lock.');
+              return;
+            }
+
+            throw error;
+          }
           onLoginSuccess();
         }
       } else {
         // Local Synthetic Mode Demo Authentication
-        const cleanEmail = email.trim().toLowerCase();
         if (
           (cleanEmail === 'admin@ftm.local' && password === 'DemoAdmin@2026') ||
           cleanEmail === 'admin' ||
@@ -66,6 +109,29 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       setErrorMsg(err.message || 'Authentication error.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMsg('Please enter your email address to resend confirmation.');
+      return;
+    }
+    setIsResending(true);
+    try {
+      const res = await resendConfirmationEmail(cleanEmail);
+      if (res.success) {
+        setInfoMsg(`Confirmation email resent to ${cleanEmail}. Please check your inbox and spam folder.`);
+        setErrorMsg('');
+        setIsUnconfirmedError(false);
+      } else {
+        setErrorMsg(res.error || 'Failed to resend confirmation email.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error resending confirmation.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -111,7 +177,14 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
         </div>
       ) : (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
-          <p className="font-bold">Cloud Dev Project Connected</p>
+          <div className="flex items-center justify-between">
+            <p className="font-bold">Cloud Dev Project Connected</p>
+            {getSupabaseProjectHost() && (
+              <span className="font-mono text-[10px] text-emerald-900 bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                {getSupabaseProjectHost()}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-emerald-700">
             Authenticated via Supabase. Sign in with your organizer account.
           </p>
@@ -128,9 +201,24 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       {/* Error alert */}
       {errorMsg && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="flex-1">{errorMsg}</span>
+          </div>
+          {isUnconfirmedError && (
+            <div className="pt-2 border-t border-red-200 flex items-center justify-between">
+              <span className="text-[11px] text-red-600">Need a new verification link?</span>
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={isResending}
+                className="px-2.5 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
+              >
+                {isResending ? 'Sending...' : 'Resend Confirmation Email'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

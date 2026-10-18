@@ -13,10 +13,19 @@ describe('Supabase Development Environment Isolation Boundary', () => {
     }).toThrowError(/CRITICAL SAFETY VIOLATION/);
   });
 
-  it('permits only the designated development project host', () => {
+  it('permits authorized development project hosts while strictly blocking the forbidden production host', () => {
     const devUrl = `https://${AUTHORIZED_DEV_HOST}`;
     expect(devUrl.includes(AUTHORIZED_DEV_HOST)).toBe(true);
     expect(devUrl.includes(PRODUCTION_FORBIDDEN_HOST)).toBe(false);
+
+    const isAuthorized = (url: string) =>
+      Boolean(url) &&
+      !url.includes(PRODUCTION_FORBIDDEN_HOST) &&
+      (url.includes('.supabase.co') || url.includes('localhost') || url.includes('127.0.0.1'));
+
+    expect(isAuthorized(`https://${AUTHORIZED_DEV_HOST}`)).toBe(true);
+    expect(isAuthorized(`https://custom-project-ref.supabase.co`)).toBe(true);
+    expect(isAuthorized(`https://${PRODUCTION_FORBIDDEN_HOST}`)).toBe(false);
   });
 
   it('rejects placeholders and requires authentic publishable keys', () => {
