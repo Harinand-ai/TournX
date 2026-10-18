@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Team, Player, Position } from '../../types/tournament';
+import { Team, Player } from '../../types/tournament';
 import { Tournament } from '../../types/multiTenant';
 import {
   validateTeamsCSV,
@@ -19,9 +19,7 @@ import {
   AlertCircle, 
   Users, 
   Shield, 
-  Check, 
-  ChevronRight,
-  FileText
+  Check
 } from 'lucide-react';
 
 interface BulkImportSectionProps {

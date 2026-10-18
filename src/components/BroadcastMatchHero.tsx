@@ -1,7 +1,7 @@
 import React from 'react';
 import { Match, Team } from '../types/tournament';
 import { TeamBadge } from './TeamBadge';
-import { Calendar, Clock, MapPin, ChevronRight, Play } from 'lucide-react';
+import { Calendar, Clock, MapPin, ChevronRight } from 'lucide-react';
 
 interface BroadcastMatchHeroProps {
   match: Match;

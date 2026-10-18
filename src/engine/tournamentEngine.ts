@@ -9,8 +9,6 @@
 
 import {
   TournamentRulesConfig,
-  TieBreakerCriterion,
-  StageType,
 } from '../types/multiTenant';
 
 export interface EngineTeam {
@@ -286,7 +284,6 @@ export function generateSingleEliminationKnockout(
 
   // Build rounds from final down to round 1 so next_match_id can be linked
   for (let r = 0; r < totalRounds; r++) {
-    const roundIdx = r;
     const matchesInRound = bracketSize / Math.pow(2, r + 1);
     const roundMatches: EngineMatch[] = [];
 
@@ -560,3 +557,157 @@ export function calculateDeterministicStandings(
     position: idx + 1,
   }));
 }
+
+export interface LeagueWithPlayoffsOptions {
+  roundRobinType?: 'SINGLE' | 'DOUBLE';
+  qualifiersCount?: 2 | 4;
+  includeThirdPlace?: boolean;
+  startMatchNumber?: number;
+  stageId?: string;
+  playoffStageId?: string;
+  idPrefix?: string;
+}
+
+/**
+ * Generates League followed by Playoffs (top 2 direct to Final, or top 4 to Semifinals + Final).
+ */
+export function generateLeagueWithPlayoffs(
+  teams: EngineTeam[],
+  options: LeagueWithPlayoffsOptions = {}
+): { leagueMatches: EngineMatch[]; playoffMatches: EngineMatch[]; allMatches: EngineMatch[] } {
+  validateTeams(teams);
+  const rrType = options.roundRobinType || 'SINGLE';
+  const qualifiers = options.qualifiersCount || (teams.length >= 4 ? 4 : 2);
+  const startNum = options.startMatchNumber || 1;
+  const stageId = options.stageId || 'stage-league-1';
+  const playoffStageId = options.playoffStageId || 'stage-playoff-1';
+  const prefix = options.idPrefix || 'm-lp';
+
+  // 1. Generate League Matches
+  const leagueMatches = rrType === 'DOUBLE'
+    ? generateDoubleRoundRobin(teams, { startMatchNumber: startNum, stageId, idPrefix: `${prefix}-lg` })
+    : generateSingleRoundRobin(teams, { startMatchNumber: startNum, stageId, idPrefix: `${prefix}-lg` });
+
+  let nextMatchNum = startNum + leagueMatches.length;
+  const playoffMatches: EngineMatch[] = [];
+  const maxRoundNumber = Math.max(...leagueMatches.map(m => m.round_number), 0);
+
+  if (qualifiers === 2) {
+    // Top 2 advance directly to Final
+    playoffMatches.push({
+      id: `${prefix}-final`,
+      stage_id: playoffStageId,
+      group_id: null,
+      match_number: nextMatchNum++,
+      round_number: maxRoundNumber + 1,
+      round_name: 'Final',
+      home_team_id: null,
+      away_team_id: null,
+      home_score: null,
+      away_score: null,
+      status: 'UPCOMING',
+    });
+  } else {
+    // Top 4 advance to Semifinals (1st vs 4th, 2nd vs 3rd), followed by Final
+    const finalMatchId = `${prefix}-final`;
+    const sf1: EngineMatch = {
+      id: `${prefix}-sf1`,
+      stage_id: playoffStageId,
+      group_id: null,
+      match_number: nextMatchNum++,
+      round_number: maxRoundNumber + 1,
+      round_name: 'Semi-Final 1 (1st vs 4th)',
+      home_team_id: null,
+      away_team_id: null,
+      home_score: null,
+      away_score: null,
+      status: 'UPCOMING',
+      next_match_id: finalMatchId,
+      next_match_slot: 'HOME',
+    };
+
+    const sf2: EngineMatch = {
+      id: `${prefix}-sf2`,
+      stage_id: playoffStageId,
+      group_id: null,
+      match_number: nextMatchNum++,
+      round_number: maxRoundNumber + 1,
+      round_name: 'Semi-Final 2 (2nd vs 3rd)',
+      home_team_id: null,
+      away_team_id: null,
+      home_score: null,
+      away_score: null,
+      status: 'UPCOMING',
+      next_match_id: finalMatchId,
+      next_match_slot: 'AWAY',
+    };
+
+    const finalMatch: EngineMatch = {
+      id: finalMatchId,
+      stage_id: playoffStageId,
+      group_id: null,
+      match_number: nextMatchNum++,
+      round_number: maxRoundNumber + 2,
+      round_name: 'Final',
+      home_team_id: null,
+      away_team_id: null,
+      home_score: null,
+      away_score: null,
+      status: 'UPCOMING',
+    };
+
+    playoffMatches.push(sf1, sf2);
+
+    if (options.includeThirdPlace) {
+      const thirdPlaceMatch: EngineMatch = {
+        id: `${prefix}-3rd`,
+        stage_id: playoffStageId,
+        group_id: null,
+        match_number: nextMatchNum++,
+        round_number: maxRoundNumber + 2,
+        round_name: '3rd Place Playoff',
+        home_team_id: null,
+        away_team_id: null,
+        home_score: null,
+        away_score: null,
+        status: 'UPCOMING',
+      };
+      playoffMatches.push(thirdPlaceMatch);
+    }
+
+    playoffMatches.push(finalMatch);
+  }
+
+  return {
+    leagueMatches,
+    playoffMatches,
+    allMatches: [...leagueMatches, ...playoffMatches],
+  };
+}
+
+/**
+ * Updates playoff match team slots based on league standings.
+ */
+export function updatePlayoffSlotsFromStandings(
+  playoffMatches: EngineMatch[],
+  standings: EngineStandingEntry[]
+): EngineMatch[] {
+  if (!standings || standings.length < 2) return playoffMatches;
+
+  return playoffMatches.map(m => {
+    const updated = { ...m };
+    if (m.round_name === 'Final' && !m.next_match_id) {
+      // Direct 2-team final
+      if (!updated.home_team_id && standings[0]) updated.home_team_id = standings[0].team_id;
+      if (!updated.away_team_id && standings[1]) updated.away_team_id = standings[1].team_id;
+    } else if (m.round_name?.includes('Semi-Final 1')) {
+      if (!updated.home_team_id && standings[0]) updated.home_team_id = standings[0].team_id;
+      if (!updated.away_team_id && standings[3]) updated.away_team_id = standings[3].team_id;
+    } else if (m.round_name?.includes('Semi-Final 2')) {
+      if (!updated.home_team_id && standings[1]) updated.home_team_id = standings[1].team_id;
+      if (!updated.away_team_id && standings[2]) updated.away_team_id = standings[2].team_id;
+    }
+    return updated;
+  });
+}
+

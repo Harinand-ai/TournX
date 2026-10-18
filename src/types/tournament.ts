@@ -19,6 +19,7 @@ export interface Player {
   name: string;
   position: Position;
   is_captain: boolean;
+  jersey_number?: number;
   photo_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -26,6 +27,7 @@ export interface Player {
 
 export interface Match {
   id: string;
+  tournament_id?: string;
   match_number: number;
   round_number?: number;
   home_team_id: string;
@@ -41,6 +43,7 @@ export interface Match {
   status: MatchStatus;
   home_score: number | null;
   away_score: number | null;
+  metadata?: Record<string, any>;
   created_at?: string;
   updated_at?: string;
 }

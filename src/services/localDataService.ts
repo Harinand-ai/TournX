@@ -23,6 +23,7 @@ import {
 import {
   Tournament,
   TournamentRulesConfig,
+  TournamentVisibility,
   AccessCode,
 } from '../types/multiTenant';
 import {
@@ -38,6 +39,18 @@ import {
 } from '../data/syntheticData';
 import { DEFAULT_RULES_CONFIG } from '../engine/tournamentEngine';
 
+export interface TournamentInvite {
+  id: string;
+  tournament_id: string;
+  email: string;
+  role: 'ORGANIZER' | 'SCORE' | 'VIEW';
+  code: string;
+  created_at: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED';
+  accepted_by?: string;
+  accepted_at?: string;
+}
+
 export const FTM_STORAGE_KEYS = {
   DEV_MODE: 'ftm_dev_mode_active',
   SCHEMA_VERSION: 'ftm_dev_schema_version',
@@ -47,6 +60,9 @@ export const FTM_STORAGE_KEYS = {
   VOTER_ID: 'ftm_dev_voter_id',
   ACTIVE_TAB: 'ftm_dev_active_tab',
   ACTIVE_PARAM: 'ftm_dev_active_param',
+  LAST_JOINED_ID: 'ftm_last_joined_tournament_id',
+  LAST_JOINED_SLUG: 'ftm_last_joined_tournament_slug',
+  PROMPT_DRAFT: 'ftm_master_prompt_draft',
 } as const;
 
 export const DEMO_TOURNAMENT_ID = 'ftm-demo-tourney-01';
@@ -282,9 +298,11 @@ class LocalDataService {
 
   // ================= TOURNAMENT MANAGEMENT =================
 
-  public getAllTournaments(): Tournament[] {
+  public getAllTournaments(includeDeleted: boolean = false): Tournament[] {
     this.initialize();
-    return this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
+    const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
+    if (includeDeleted) return all;
+    return all.filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
   }
 
   public getActiveTournamentId(): string {
@@ -294,14 +312,26 @@ class LocalDataService {
   }
 
   public setActiveTournamentId(id: string): void {
-    const tournaments = this.getAllTournaments();
-    const found = tournaments.find(t => t.id === id);
-    if (!found) {
-      console.warn(`[LocalDataService] Tournament ID "${id}" not found. Keeping current.`);
-      return;
-    }
+    if (!id) return;
     const storage = this.getStorage();
     storage.setItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID, id);
+  }
+
+  public registerTournament(tournament: Tournament): void {
+    this.initialize();
+    const all = this.getAllTournaments();
+    const cleanSlug = tournament.slug ? tournament.slug.toLowerCase().trim() : '';
+    const existingIndex = all.findIndex(t => 
+      t.id === tournament.id || 
+      (cleanSlug && t.slug && t.slug.toLowerCase().trim() === cleanSlug)
+    );
+    if (existingIndex >= 0) {
+      all[existingIndex] = { ...all[existingIndex], ...tournament };
+    } else {
+      all.push(tournament);
+    }
+    this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, all);
+    this.setActiveTournamentId(tournament.id);
   }
 
   public getActiveTournament(): Tournament {
@@ -310,14 +340,77 @@ class LocalDataService {
     return all.find(t => t.id === activeId) || all[0];
   }
 
-  public getTournamentById(id: string): Tournament | null {
-    const all = this.getAllTournaments();
+  public getTournamentById(id: string, includeDeleted: boolean = true): Tournament | null {
+    if (!id) return null;
+    const all = this.getAllTournaments(includeDeleted);
     return all.find(t => t.id === id) || null;
   }
 
-  public getTournamentBySlug(slug: string): Tournament | null {
+  public getTournamentBySlug(slug: string, includeDeleted: boolean = true): Tournament | null {
+    if (!slug) return null;
+    const clean = slug.toLowerCase().trim();
+    const all = this.getAllTournaments(includeDeleted);
+    return all.find(t => (t.slug && t.slug.toLowerCase().trim() === clean) || t.id.toLowerCase() === clean) || null;
+  }
+
+  public getActiveOrganizerTournament(organizerId?: string): Tournament | null {
+    if (!organizerId) return null;
     const all = this.getAllTournaments();
-    return all.find(t => t.slug === slug || t.id === slug) || null;
+    return all.find(t => {
+      if (t.id === DEMO_TOURNAMENT_ID) return false;
+      if (t.deleted_at || t.status === 'ARCHIVED' || t.status === 'COMPLETED') return false;
+      if (t.created_by !== organizerId) return false;
+      // If tournament has an expiry date in the past, treat as not active
+      if (t.expires_at && new Date(t.expires_at).getTime() < Date.now()) return false;
+      return true;
+    }) || null;
+  }
+
+  public getLastJoinedTournament(): { id: string | null; slug: string | null } {
+    const storage = this.getStorage();
+    const id = storage.getItem(FTM_STORAGE_KEYS.LAST_JOINED_ID);
+    const slug = storage.getItem(FTM_STORAGE_KEYS.LAST_JOINED_SLUG);
+    return { id, slug };
+  }
+
+  public setLastJoinedTournament(id: string, slug?: string): void {
+    if (!id) return;
+    const storage = this.getStorage();
+    storage.setItem(FTM_STORAGE_KEYS.LAST_JOINED_ID, id);
+    if (slug) {
+      storage.setItem(FTM_STORAGE_KEYS.LAST_JOINED_SLUG, slug);
+    }
+  }
+
+  public clearLastJoinedTournament(): void {
+    const storage = this.getStorage();
+    storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_ID);
+    storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_SLUG);
+  }
+
+  public isTournamentExpiredOrDeleted(tournament: Tournament): { isExpired: boolean; isDeleted: boolean; reason?: string } {
+    if (tournament.deleted_at) {
+      return { isExpired: false, isDeleted: true, reason: 'This tournament has been deleted by the organizer.' };
+    }
+    if (tournament.status === 'ARCHIVED') {
+      return { isExpired: true, isDeleted: false, reason: 'This tournament has concluded and been archived.' };
+    }
+    if (tournament.expires_at && new Date(tournament.expires_at).getTime() < Date.now()) {
+      return { isExpired: true, isDeleted: false, reason: 'This tournament has expired due to inactivity.' };
+    }
+    return { isExpired: false, isDeleted: false };
+  }
+
+  public touchTournamentActivity(id: string): void {
+    const tourney = this.getTournamentById(id);
+    if (!tourney) return;
+    const now = new Date();
+    const days = tourney.inactivity_days || 7;
+    const expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+    this.updateTournament(id, {
+      last_activity_at: now.toISOString(),
+      expires_at: expiresAt,
+    });
   }
 
   public createTournament(input: {
@@ -325,10 +418,23 @@ class LocalDataService {
     slug?: string;
     description?: string;
     season?: string;
+    visibility?: TournamentVisibility;
     rules_config?: Partial<TournamentRulesConfig>;
+    organizerId?: string;
+    inactivityDays?: number;
   }): Tournament {
     this.initialize();
     const all = this.getAllTournaments();
+
+    // Enforce one active tournament per organizer account rule
+    if (input.organizerId) {
+      const existingActive = this.getActiveOrganizerTournament(input.organizerId);
+      if (existingActive) {
+        throw new Error(
+          `You already own an active tournament ("${existingActive.name}"). Each organizer account may own only one active tournament at a time. Delete or archive your existing tournament before creating another.`
+        );
+      }
+    }
 
     const id = `tourney-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
     let baseSlug = input.slug ? slugify(input.slug) : slugify(input.name);
@@ -341,6 +447,10 @@ class LocalDataService {
       finalSlug = `${baseSlug}-${counter++}`;
     }
 
+    const now = new Date();
+    const inactDays = input.inactivityDays || 7;
+    const expiresAt = new Date(now.getTime() + inactDays * 24 * 60 * 60 * 1000).toISOString();
+
     const newTournament: Tournament = {
       id,
       name: input.name.trim(),
@@ -349,18 +459,24 @@ class LocalDataService {
       season: input.season?.trim() || new Date().getFullYear().toString(),
       logo_url: null,
       status: 'REGISTRATION',
-      visibility: 'PRIVATE',
+      visibility: input.visibility || 'PRIVATE',
+      created_by: input.organizerId || null,
+      last_activity_at: now.toISOString(),
+      expires_at: expiresAt,
+      inactivity_days: inactDays,
+      deleted_at: null,
       rules_config: {
         ...DEFAULT_RULES_CONFIG,
         ...(input.rules_config || {}),
       },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
     };
 
     all.push(newTournament);
     this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, all);
     this.setActiveTournamentId(id);
+    this.setLastJoinedTournament(id, finalSlug);
 
     // Initialize empty collections for new tournament
     this.setItem(this.tourneyKey(id, 'teams'), []);
@@ -414,15 +530,62 @@ class LocalDataService {
       return false;
     }
 
-    const all = this.getAllTournaments();
+    const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
+    const target = all.find(t => t.id === id);
     const filtered = all.filter(t => t.id !== id);
     this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, filtered);
 
-    // Switch active if current was deleted
-    if (this.getActiveTournamentId() === id) {
-      this.setActiveTournamentId(DEMO_TOURNAMENT_ID);
+    // Deep clean all tournament sub-collections from storage
+    const collections = [
+      'teams', 'matches', 'players', 'goals', 'assists',
+      'motm', 'access_codes', 'rules', 'potm_polls',
+      'potm_candidates', 'potm_votes', 'committee'
+    ];
+    const storage = this.getStorage();
+    for (const col of collections) {
+      storage.removeItem(this.tourneyKey(id, col));
     }
 
+    // Clear last joined tournament pointer if it pointed to this tournament
+    const last = this.getLastJoinedTournament();
+    if (last.id === id || (target?.slug && last.slug === target.slug)) {
+      this.clearLastJoinedTournament();
+    }
+
+    // Switch active tournament if current was deleted
+    if (this.getActiveTournamentId() === id) {
+      const nextActive = filtered.find(t => !t.deleted_at && t.status !== 'ARCHIVED')?.id || DEMO_TOURNAMENT_ID;
+      this.setActiveTournamentId(nextActive);
+    }
+
+    return true;
+  }
+
+  public softDeleteTournament(id: string): boolean {
+    if (id === DEMO_TOURNAMENT_ID) {
+      console.warn('Cannot delete the default TournX demo tournament.');
+      return false;
+    }
+
+    const tourney = this.getTournamentById(id);
+    if (!tourney) return false;
+
+    this.updateTournament(id, {
+      status: 'ARCHIVED',
+      deleted_at: new Date().toISOString(),
+    });
+
+    // Clear last joined tournament pointer
+    const last = this.getLastJoinedTournament();
+    if (last.id === id || (tourney.slug && last.slug === tourney.slug)) {
+      this.clearLastJoinedTournament();
+    }
+
+    if (this.getActiveTournamentId() === id) {
+      const remaining = this.getAllTournaments();
+      const nextActive = remaining.find(t => t.id !== id && !t.deleted_at && t.status !== 'ARCHIVED')?.id || DEMO_TOURNAMENT_ID;
+      this.setActiveTournamentId(nextActive);
+    }
     return true;
   }
 
@@ -467,6 +630,12 @@ class LocalDataService {
     this.setItem(this.tourneyKey(tId, 'teams'), teams);
   }
 
+  public updateTeam(team: Team, tournamentId?: string): void {
+    const teams = this.getTeams(tournamentId);
+    const updated = teams.map(t => (t.id === team.id ? { ...t, ...team } : t));
+    this.setTeams(updated, tournamentId);
+  }
+
   public updateTeamManager(teamId: string, managerName: string, tournamentId?: string): void {
     const teams = this.getTeams(tournamentId);
     const updated = teams.map(t => (t.id === teamId ? { ...t, manager_name: managerName } : t));
@@ -485,12 +654,18 @@ class LocalDataService {
   }
 
   public addPlayer(player: Player, tournamentId?: string): void {
-    const players = this.getPlayers(tournamentId);
+    let players = this.getPlayers(tournamentId);
+    if (player.is_captain) {
+      players = players.map(p => (p.team_id === player.team_id ? { ...p, is_captain: false } : p));
+    }
     this.setPlayers([...players, player], tournamentId);
   }
 
   public updatePlayer(updated: Player, tournamentId?: string): void {
-    const players = this.getPlayers(tournamentId);
+    let players = this.getPlayers(tournamentId);
+    if (updated.is_captain) {
+      players = players.map(p => (p.team_id === updated.team_id && p.id !== updated.id ? { ...p, is_captain: false } : p));
+    }
     this.setPlayers(players.map(p => (p.id === updated.id ? updated : p)), tournamentId);
   }
 
@@ -680,14 +855,19 @@ class LocalDataService {
   }
 
   public getSessionRole(tournamentId: string): 'VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS' {
-    if (this.isDevAdminLoggedIn()) {
-      return 'ORGANIZER';
-    }
     const storage = this.getStorage();
-    const role = storage.getItem(`ftm_role_${tournamentId}`);
-    if (role === 'VIEW' || role === 'SCORE' || role === 'ORGANIZER') {
-      return role;
+    const explicitRole = storage.getItem(`ftm_role_${tournamentId}`);
+    if (explicitRole === 'VIEW' || explicitRole === 'SCORE' || explicitRole === 'ORGANIZER') {
+      return explicitRole;
     }
+
+    if (this.isDevAdminLoggedIn()) {
+      const tourney = this.getTournamentById(tournamentId);
+      if (tournamentId === DEMO_TOURNAMENT_ID || tourney?.created_by === 'dev-admin') {
+        return 'ORGANIZER';
+      }
+    }
+
     return 'ANONYMOUS';
   }
 
@@ -730,6 +910,81 @@ class LocalDataService {
   public setVotes(votes: POTMVote[], tournamentId?: string): void {
     const tId = tournamentId || this.getActiveTournamentId();
     this.setItem(this.tourneyKey(tId, 'votes'), votes);
+  }
+
+  // ================= COLLABORATOR INVITATIONS =================
+  public getInvites(tournamentId?: string): TournamentInvite[] {
+    const tId = tournamentId || this.getActiveTournamentId();
+    return this.getItem<TournamentInvite[]>(this.tourneyKey(tId, 'invites'), []);
+  }
+
+  public createInvite(
+    tournamentId: string,
+    email: string,
+    role: 'ORGANIZER' | 'SCORE' | 'VIEW'
+  ): TournamentInvite {
+    const cleanEmail = email.trim().toLowerCase();
+    const invites = this.getInvites(tournamentId);
+    const existing = invites.find(i => i.email === cleanEmail && i.status === 'PENDING');
+    if (existing) {
+      return existing;
+    }
+
+    const code = 'INV-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newInvite: TournamentInvite = {
+      id: 'inv-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6),
+      tournament_id: tournamentId,
+      email: cleanEmail,
+      role,
+      code,
+      created_at: new Date().toISOString(),
+      status: 'PENDING',
+    };
+
+    this.setItem(this.tourneyKey(tournamentId, 'invites'), [newInvite, ...invites]);
+    return newInvite;
+  }
+
+  public revokeInvite(tournamentId: string, inviteId: string): void {
+    const invites = this.getInvites(tournamentId);
+    const updated = invites.map(i => (i.id === inviteId ? { ...i, status: 'REVOKED' as const } : i));
+    this.setItem(this.tourneyKey(tournamentId, 'invites'), updated);
+  }
+
+  public acceptInvite(
+    inviteCode: string,
+    userEmail: string,
+    userId?: string
+  ): { success: boolean; tournament?: Tournament; role?: 'ORGANIZER' | 'SCORE' | 'VIEW'; error?: string } {
+    const codeClean = inviteCode.trim().toUpperCase();
+    const emailClean = userEmail.trim().toLowerCase();
+    const tournaments = this.getAllTournaments();
+
+    for (const t of tournaments) {
+      const invites = this.getInvites(t.id);
+      const match = invites.find(i => i.code === codeClean && i.status === 'PENDING');
+      if (match) {
+        if (match.email !== emailClean) {
+          return {
+            success: false,
+            error: `This invitation was issued to ${match.email}. Please sign in with that email address.`,
+          };
+        }
+
+        // Mark accepted
+        const updated = invites.map(i =>
+          i.id === match.id
+            ? { ...i, status: 'ACCEPTED' as const, accepted_by: userId || emailClean, accepted_at: new Date().toISOString() }
+            : i
+        );
+        this.setItem(this.tourneyKey(t.id, 'invites'), updated);
+        this.setSessionRole(t.id, match.role);
+
+        return { success: true, tournament: t, role: match.role };
+      }
+    }
+
+    return { success: false, error: 'Invalid or expired invitation code.' };
   }
 
   // Local Admin Session

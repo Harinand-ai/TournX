@@ -16,7 +16,8 @@ export type StageType =
   | 'DOUBLE_ROUND_ROBIN'
   | 'GROUP_STAGE'
   | 'SINGLE_ELIMINATION'
-  | 'DOUBLE_ELIMINATION';
+  | 'DOUBLE_ELIMINATION'
+  | 'LEAGUE_WITH_PLAYOFFS';
 
 export type StageStatus = 'PENDING' | 'ACTIVE' | 'COMPLETED';
 
@@ -55,6 +56,14 @@ export interface TournamentRulesConfig {
   allow_draws?: boolean;
   extra_time_enabled?: boolean;
   penalty_shootout_enabled?: boolean;
+  sport?: string;
+  match_type?: string;
+  starting_players_per_team?: number;
+  substitutes_per_team?: number;
+  squad_size?: number;
+  playoff_qualifiers?: 2 | 4;
+  include_third_place_playoff?: boolean;
+  [key: string]: any;
 }
 
 export interface Tournament {
@@ -68,6 +77,10 @@ export interface Tournament {
   visibility: TournamentVisibility;
   rules_config: TournamentRulesConfig;
   created_by?: string | null;
+  expires_at?: string | null;
+  last_activity_at?: string | null;
+  deleted_at?: string | null;
+  inactivity_days?: number;
   created_at: string;
   updated_at: string;
 }

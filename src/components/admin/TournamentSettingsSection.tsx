@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Tournament, TournamentRulesConfig } from '../../types/multiTenant';
+import { Tournament } from '../../types/multiTenant';
 import { localDataService, DEMO_TOURNAMENT_ID } from '../../services/localDataService';
+import { tournamentService } from '../../services/tournamentService';
 import { 
   Settings, 
   Save, 
@@ -11,17 +12,21 @@ import {
   RotateCcw, 
   Trash2,
   Sliders,
-  Shield
+  Shield,
+  Loader2,
+  X
 } from 'lucide-react';
 
 interface TournamentSettingsSectionProps {
   tournament: Tournament;
   onTournamentUpdated: () => void;
+  onTournamentDeleted?: (nextTournamentId: string) => void;
 }
 
 export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps> = ({
   tournament,
   onTournamentUpdated,
+  onTournamentDeleted,
 }) => {
   const [name, setName] = useState(tournament.name || '');
   const [slug, setSlug] = useState(tournament.slug || '');
@@ -36,16 +41,24 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
   const [lossPoints, setLossPoints] = useState(tournament.rules_config?.points_for_loss ?? 0);
   const [matchDuration, setMatchDuration] = useState(tournament.rules_config?.match_duration_minutes ?? 50);
 
+  // Features config
+  const [features, setFeatures] = useState({
+    potmVoting: tournament.rules_config?.features?.potmVoting ?? true,
+    goalscorersAndEvents: tournament.rules_config?.features?.goalscorersAndEvents ?? true,
+    cardsAndSubs: tournament.rules_config?.features?.cardsAndSubs ?? true,
+    referees: tournament.rules_config?.features?.referees ?? true,
+  });
+
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setFeedback(null);
 
     try {
-      localDataService.updateTournament(tournament.id, {
+      const updates = {
         name: name.trim(),
         slug: slug.trim() || undefined,
         description: description.trim(),
@@ -58,8 +71,15 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
           points_for_draw: drawPoints,
           points_for_loss: lossPoints,
           match_duration_minutes: matchDuration,
+          features: {
+            ...(tournament.rules_config?.features || {}),
+            ...features,
+          },
         },
-      });
+      };
+
+      await tournamentService.updateTournament(tournament.id, updates);
+      localDataService.updateTournament(tournament.id, updates);
 
       setFeedback({ type: 'success', message: 'Tournament settings saved successfully.' });
       onTournamentUpdated();
@@ -71,22 +91,38 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
     }
   };
 
-  const handleResetDemo = () => {
-    if (window.confirm('Reset demo tournament data to initial state? (User-created tournaments will NOT be deleted).')) {
-      localDataService.resetDemoData();
-      window.location.reload();
-    }
+  const [showResetDemoModal, setShowResetDemoModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmResetDemo = () => {
+    localDataService.resetDemoData();
+    setShowResetDemoModal(false);
+    window.location.reload();
   };
 
-  const handleDelete = () => {
+  const confirmDelete = async () => {
     if (tournament.id === DEMO_TOURNAMENT_ID) {
-      alert('The default TournX demo tournament cannot be deleted.');
+      setDeleteError('The default TournX demo tournament cannot be deleted.');
       return;
     }
 
-    if (window.confirm(`Are you sure you want to permanently delete "${tournament.name}"? This action cannot be undone.`)) {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await tournamentService.deleteTournament(tournament.id);
       localDataService.deleteTournament(tournament.id);
-      window.location.reload();
+      localDataService.clearLastJoinedTournament();
+
+      if (onTournamentDeleted) {
+        onTournamentDeleted(DEMO_TOURNAMENT_ID);
+      } else {
+        window.location.href = '/';
+      }
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete tournament');
+      setIsDeleting(false);
     }
   };
 
@@ -318,6 +354,48 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
             </div>
           </div>
 
+          {/* Optional Features Card */}
+          <div className="p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+              <Settings className="w-4 h-4 text-purple-400" />
+              Tournament Feature Switches
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {[
+                { id: 'potmVoting' as const, label: 'Player of the Match (POTM)', desc: 'Voting & nominations' },
+                { id: 'goalscorersAndEvents' as const, label: 'Goalscorer Tracking', desc: 'Golden boot & events' },
+                { id: 'cardsAndSubs' as const, label: 'Cards & Disciplinary', desc: 'Yellow/red cards tracking' },
+                { id: 'referees' as const, label: 'Match Officials', desc: 'Referee assignments' },
+              ].map((item) => {
+                const isEnabled = features[item.id];
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setFeatures(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                      isEnabled
+                        ? 'bg-purple-950/20 border-purple-500/40 text-purple-200'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400'
+                    }`}
+                  >
+                    <div>
+                      <div className="text-xs font-semibold">{item.label}</div>
+                      <div className="text-[10px] text-zinc-500">{item.desc}</div>
+                    </div>
+                    <div
+                      className={`w-9 h-5 rounded-full transition-colors p-0.5 shrink-0 flex items-center ${
+                        isEnabled ? 'bg-purple-600 justify-end' : 'bg-zinc-800 justify-start'
+                      }`}
+                    >
+                      <div className="w-4 h-4 rounded-full bg-white shadow-xs" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Danger Zone Card */}
           <div className="p-6 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-rose-400 flex items-center gap-2">
@@ -334,8 +412,8 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
               </div>
               <button
                 type="button"
-                onClick={handleResetDemo}
-                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-semibold shrink-0 flex items-center gap-1.5"
+                onClick={() => setShowResetDemoModal(true)}
+                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-semibold shrink-0 flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset Demo
@@ -352,8 +430,8 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
                 </div>
                 <button
                   type="button"
-                  onClick={handleDelete}
-                  className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-lg shadow-rose-500/20"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white text-xs font-bold shrink-0 flex items-center gap-1.5 shadow-lg shadow-rose-500/20 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete Tournament
@@ -363,6 +441,131 @@ export const TournamentSettingsSection: React.FC<TournamentSettingsSectionProps>
           </div>
         </div>
       </form>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-zinc-900 border border-rose-500/30 rounded-2xl p-6 shadow-2xl text-left space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-2.5 text-rose-400">
+                <span className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                  <Trash2 className="w-5 h-5 text-rose-400" />
+                </span>
+                <div>
+                  <h3 className="font-bold text-white text-base">Delete Tournament?</h3>
+                  <p className="text-xs text-zinc-400">This action cannot be undone.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isDeleting) {
+                    setShowDeleteModal(false);
+                    setDeleteError(null);
+                  }
+                }}
+                disabled={isDeleting}
+                className="text-zinc-500 hover:text-zinc-300 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs space-y-2">
+              <div className="text-zinc-300">
+                You are about to permanently delete tournament:
+              </div>
+              <div className="font-bold text-sm text-white font-mono bg-zinc-900 p-2 rounded-lg border border-zinc-800">
+                {tournament.name}
+              </div>
+              <div className="text-[11px] text-zinc-400">
+                Tournament ID: <span className="font-mono text-zinc-300">{tournament.id}</span>
+              </div>
+              <div className="text-rose-400 text-[11px] font-semibold pt-1 border-t border-zinc-800/80">
+                All associated matches, squads, player statistics, and access codes will be wiped.
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteError(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-lg shadow-rose-600/30"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Permanently Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Demo Confirmation Modal */}
+      {showResetDemoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl text-left space-y-4">
+            <div className="flex items-center gap-2.5 text-zinc-200">
+              <span className="p-2 rounded-xl bg-zinc-800">
+                <RotateCcw className="w-5 h-5 text-amber-400" />
+              </span>
+              <div>
+                <h3 className="font-bold text-white text-base">Reset Demo Data?</h3>
+                <p className="text-xs text-zinc-400">Restore default demo matches and teams.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300">
+              Custom tournaments will <span className="font-bold text-white">not</span> be deleted. Only the default demo tournament state will be reset.
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetDemoModal(false)}
+                className="px-4 py-2 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmResetDemo}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Demo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

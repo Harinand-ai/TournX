@@ -2,7 +2,7 @@ import React from 'react';
 import { Match, Team, Goal, ManOfTheMatch, Player } from '../types/tournament';
 import { TeamBadge } from '../components/TeamBadge';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import { Calendar, Clock, MapPin, Award, ArrowLeft, Radio, ArrowRight, Shield } from 'lucide-react';
+import { Calendar, Clock, MapPin, Award, ArrowLeft, Radio, ArrowRight } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { POTMPollCard } from '../components/POTMPollCard';
 
@@ -188,18 +188,18 @@ export const MatchDetailPage: React.FC<MatchDetailPageProps> = ({
       {isLive && (
         <button
           onClick={onOpenLiveWindow}
-          className="w-full block p-3.5 mc-btn-red text-left shadow-md cursor-pointer"
+          className="w-full block p-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-left shadow-xs transition cursor-pointer"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-black/30 border border-white/20 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center">
                 <Radio className="w-4 h-4 text-white animate-pulse" />
               </div>
               <div>
-                <span className="font-black text-xs uppercase block tracking-wider text-white">
-                  LIVE SCORE
+                <span className="font-bold text-xs uppercase block tracking-wider text-white">
+                  Live Score
                 </span>
-                <span className="text-xs text-[#ffaaaa]">
+                <span className="text-xs text-rose-100">
                   Open in-app match broadcast window
                 </span>
               </div>

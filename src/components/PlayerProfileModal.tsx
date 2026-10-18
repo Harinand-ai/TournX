@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Player, Team, Match, Goal, ManOfTheMatch, TeamStanding } from '../types/tournament';
 import { PlayerAvatar } from './PlayerAvatar';
 import { TeamBadge } from './TeamBadge';
-import { X, Award, Shield, Trophy } from 'lucide-react';
+import { X, Shield, Trophy } from 'lucide-react';
 
 interface PlayerProfileModalProps {
   player: Player | null;

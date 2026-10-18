@@ -7,12 +7,9 @@ import {
   Copy, 
   Check, 
   ShieldAlert, 
-  Ban, 
-  Clock, 
   Eye, 
   Edit3, 
-  ShieldCheck,
-  AlertCircle
+  ShieldCheck
 } from 'lucide-react';
 
 interface AccessCodesSectionProps {

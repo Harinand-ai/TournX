@@ -22,7 +22,7 @@ export const TeamDetailPage: React.FC<TeamDetailPageProps> = ({
   matches,
   standings,
   players,
-  goals,
+  goals: _goals,
   onNavigate,
   onSelectPlayer,
 }) => {

@@ -90,9 +90,20 @@ CREATE TABLE IF NOT EXISTS tournaments (
     "max_substitutes": 5
   }'::jsonb,
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ DEFAULT NULL,
+  deleted_at TIMESTAMPTZ DEFAULT NULL,
+  inactivity_days INT NOT NULL DEFAULT 7,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Enforce One Active Tournament Per Organizer Account rule at database level
+CREATE UNIQUE INDEX IF NOT EXISTS uq_organizer_single_active ON tournaments (created_by) 
+  WHERE created_by IS NOT NULL 
+    AND status NOT IN ('ARCHIVED', 'COMPLETED') 
+    AND deleted_at IS NULL;
+
 
 -- Tournament Members (User Role Assignments)
 CREATE TABLE IF NOT EXISTS tournament_members (
@@ -338,6 +349,7 @@ CREATE OR REPLACE FUNCTION get_user_tournament_role(target_tournament_id UUID)
 RETURNS tournament_role
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 STABLE
 AS $$
 DECLARE
@@ -364,3 +376,413 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+-- ------------------------------------------------------------------------------
+-- A. Tournaments Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "tournaments_read" ON tournaments
+  FOR SELECT USING (
+    visibility = 'PUBLIC' 
+    OR created_by = auth.uid() 
+    OR get_user_tournament_role(id) IS NOT NULL
+  );
+
+CREATE POLICY "tournaments_insert" ON tournaments
+  FOR INSERT WITH CHECK (
+    auth.uid() IS NOT NULL AND (created_by IS NULL OR created_by = auth.uid())
+  );
+
+CREATE POLICY "tournaments_update" ON tournaments
+  FOR UPDATE USING (
+    get_user_tournament_role(id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "tournaments_delete" ON tournaments
+  FOR DELETE USING (
+    created_by = auth.uid()
+  );
+
+-- ------------------------------------------------------------------------------
+-- B. Tournament Members Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "tournament_members_read" ON tournament_members
+  FOR SELECT USING (
+    user_id = auth.uid() 
+    OR get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "tournament_members_insert" ON tournament_members
+  FOR INSERT WITH CHECK (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "tournament_members_update" ON tournament_members
+  FOR UPDATE USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "tournament_members_delete" ON tournament_members
+  FOR DELETE USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- C. Teams & Squads Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "teams_read" ON teams
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "teams_manage" ON teams
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "players_read" ON players
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "players_manage" ON players
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- D. Stages, Groups & Enrollments Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "stages_read" ON tournament_stages
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "stages_manage" ON tournament_stages
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "groups_read" ON groups
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "groups_manage" ON groups
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "stage_teams_read" ON stage_teams
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "stage_teams_manage" ON stage_teams
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- E. Matches & Fixtures Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "matches_read" ON matches
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "matches_insert" ON matches
+  FOR INSERT WITH CHECK (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "matches_update" ON matches
+  FOR UPDATE USING (
+    get_user_tournament_role(tournament_id) IN ('ORGANIZER', 'SCORE')
+  );
+
+CREATE POLICY "matches_delete" ON matches
+  FOR DELETE USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- F. Match Events Policies (Goals, Cards, Substitutions)
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "events_read" ON match_events
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM tournaments t
+      WHERE t.id = tournament_id 
+        AND (t.visibility = 'PUBLIC' OR get_user_tournament_role(t.id) IS NOT NULL)
+    )
+  );
+
+CREATE POLICY "events_record" ON match_events
+  FOR INSERT WITH CHECK (
+    get_user_tournament_role(tournament_id) IN ('ORGANIZER', 'SCORE')
+  );
+
+CREATE POLICY "events_update" ON match_events
+  FOR UPDATE USING (
+    get_user_tournament_role(tournament_id) IN ('ORGANIZER', 'SCORE')
+  );
+
+CREATE POLICY "events_delete" ON match_events
+  FOR DELETE USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- G. Access Codes Policies (Private to Organizers only)
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "access_codes_organizer_only" ON access_codes
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- H. Media Assets Policies
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "media_assets_read" ON media_assets
+  FOR SELECT USING (true);
+
+CREATE POLICY "media_assets_manage" ON media_assets
+  FOR ALL USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+-- ------------------------------------------------------------------------------
+-- I. Audit Logs Policies (Append-only tamper-evident log)
+-- ------------------------------------------------------------------------------
+
+CREATE POLICY "audit_logs_read" ON audit_logs
+  FOR SELECT USING (
+    get_user_tournament_role(tournament_id) = 'ORGANIZER'
+  );
+
+CREATE POLICY "audit_logs_insert" ON audit_logs
+  FOR INSERT WITH CHECK (
+    auth.uid() IS NOT NULL AND (actor_id IS NULL OR actor_id = auth.uid())
+  );
+
+-- Note: No UPDATE or DELETE policies are defined for audit_logs (append-only enforcement).
+
+-- ==============================================================================
+-- 5. SECURE SERVER-SIDE ACCESS CODE REDEMPTION RPC
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS access_code_rate_limits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tournament_id UUID NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+  client_identifier TEXT NOT NULL,
+  attempt_count INT NOT NULL DEFAULT 1,
+  window_start TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_rate_limit_client UNIQUE (tournament_id, client_identifier)
+);
+
+ALTER TABLE access_code_rate_limits ENABLE ROW LEVEL SECURITY;
+
+-- Deny all direct client access to rate limit tracking table (RPC operates via SECURITY DEFINER)
+CREATE POLICY "access_code_rate_limits_deny_all" ON access_code_rate_limits
+  FOR ALL USING (false);
+
+CREATE OR REPLACE FUNCTION redeem_tournament_access_code(
+  p_tournament_id UUID,
+  p_code TEXT,
+  p_client_identifier TEXT DEFAULT 'client_default'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_code RECORD;
+  v_rate RECORD;
+  v_target_hash TEXT;
+  v_now TIMESTAMPTZ := now();
+BEGIN
+  -- 1. Input Validation
+  IF p_tournament_id IS NULL OR p_code IS NULL OR trim(p_code) = '' THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Tournament ID and access code are required.'
+    );
+  END IF;
+
+  -- 2. Verify Tournament Exists
+  IF NOT EXISTS (SELECT 1 FROM tournaments WHERE id = p_tournament_id) THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Tournament not found.'
+    );
+  END IF;
+
+  -- 3. Enforce Server-Side Rate Limiting (Max 5 attempts per 5 minutes per client)
+  SELECT * INTO v_rate 
+  FROM access_code_rate_limits
+  WHERE tournament_id = p_tournament_id AND client_identifier = p_client_identifier;
+
+  IF FOUND THEN
+    IF (v_now - v_rate.window_start) < INTERVAL '5 minutes' THEN
+      IF v_rate.attempt_count >= 5 THEN
+        RETURN jsonb_build_object(
+          'success', false,
+          'error', 'Rate limit exceeded: Too many failed attempts. Please wait 5 minutes.'
+        );
+      ELSE
+        UPDATE access_code_rate_limits
+        SET attempt_count = attempt_count + 1
+        WHERE id = v_rate.id;
+      END IF;
+    ELSE
+      UPDATE access_code_rate_limits
+      SET attempt_count = 1, window_start = v_now
+      WHERE id = v_rate.id;
+    END IF;
+  ELSE
+    INSERT INTO access_code_rate_limits (tournament_id, client_identifier, attempt_count, window_start)
+    VALUES (p_tournament_id, p_client_identifier, 1, v_now);
+  END IF;
+
+  -- 4. Compute Salted SHA-256 Hash Matching Client Algorithm Exactly
+  -- Accepts either plain access code or precomputed 64-char hex hash
+  v_target_hash := CASE
+    WHEN length(trim(p_code)) = 64 AND p_code ~ '^[0-9a-fA-F]{64}$' THEN lower(trim(p_code))
+    ELSE encode(digest('tx_salt_' || upper(trim(p_code)), 'sha256'), 'hex')
+  END;
+
+  -- 5. Verify Hash against tournament access_codes
+  SELECT * INTO v_code
+  FROM access_codes
+  WHERE tournament_id = p_tournament_id 
+    AND code_hash = v_target_hash
+    AND is_active = true;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Invalid, expired, or revoked access code.'
+    );
+  END IF;
+
+  -- 6. Check Expiration
+  IF v_code.expires_at IS NOT NULL AND v_code.expires_at < v_now THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Access code has expired.'
+    );
+  END IF;
+
+  -- 7. Check Usage Limit
+  IF v_code.max_uses IS NOT NULL AND v_code.use_count >= v_code.max_uses THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Access code has reached maximum permitted usage limit.'
+    );
+  END IF;
+
+  -- 8. Increment usage counter
+  UPDATE access_codes
+  SET use_count = use_count + 1
+  WHERE id = v_code.id;
+
+  -- Reset rate limit counter on successful redemption
+  DELETE FROM access_code_rate_limits 
+  WHERE tournament_id = p_tournament_id AND client_identifier = p_client_identifier;
+
+  -- 9. If authenticated, record/upgrade membership role
+  IF auth.uid() IS NOT NULL THEN
+    INSERT INTO tournament_members (tournament_id, user_id, role)
+    VALUES (p_tournament_id, auth.uid(), v_code.role)
+    ON CONFLICT (tournament_id, user_id)
+    DO UPDATE SET role = EXCLUDED.role, updated_at = now();
+  END IF;
+
+  -- 10. Audit log redemption
+  INSERT INTO audit_logs (tournament_id, actor_id, actor_role, action, entity_type, entity_id)
+  VALUES (p_tournament_id, auth.uid(), v_code.role, 'REDEEM_CODE', 'access_codes', v_code.id);
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'role', v_code.role,
+    'label', v_code.label,
+    'tournament_id', p_tournament_id
+  );
+END;
+$$;
+
+-- Explicit Execution Permissions on Access Code Redemption RPC
+REVOKE ALL ON FUNCTION redeem_tournament_access_code(UUID, TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION redeem_tournament_access_code(UUID, TEXT, TEXT) TO authenticated, anon;
+
+-- ==============================================================================
+-- 6. STORAGE BUCKET & ROW LEVEL SECURITY POLICIES (TOURNAMENT MEDIA)
+-- ==============================================================================
+
+-- Initialize dedicated media bucket in Supabase storage
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'tournament-media',
+  'tournament-media',
+  true,
+  5242880, -- 5 MB max per file
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS on storage.objects
+CREATE POLICY "tournament_media_read" ON storage.objects
+  FOR SELECT USING (bucket_id = 'tournament-media');
+
+CREATE POLICY "tournament_media_insert" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'tournament-media'
+    AND auth.uid() IS NOT NULL
+  );
+
+CREATE POLICY "tournament_media_update" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'tournament-media'
+    AND auth.uid() IS NOT NULL
+  );
+
+CREATE POLICY "tournament_media_delete" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'tournament-media'
+    AND auth.uid() IS NOT NULL
+  );
+
+

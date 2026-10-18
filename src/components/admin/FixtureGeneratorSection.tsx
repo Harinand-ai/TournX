@@ -11,13 +11,10 @@ import {
 import { localDataService } from '../../services/localDataService';
 import { 
   Wand2, 
-  Calendar, 
   AlertTriangle, 
   CheckCircle, 
   Layers, 
   Trophy, 
-  Clock, 
-  ChevronRight,
   RefreshCw
 } from 'lucide-react';
 

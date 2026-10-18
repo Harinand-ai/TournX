@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Player, Team } from '../types/tournament';
-import { Shield } from 'lucide-react';
 
 interface PlayerAvatarProps {
   player: Player;

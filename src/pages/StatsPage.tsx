@@ -21,7 +21,7 @@ export const StatsPage: React.FC<StatsPageProps> = ({
   topScorers,
   cleanSheets,
   motmLeaderboard,
-  teams,
+  teams: _teams,
   standings,
   players = [],
   onNavigate,

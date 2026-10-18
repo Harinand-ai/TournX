@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { tournamentService } from './services/tournamentService';
-import { localDataService, FTM_STORAGE_KEYS } from './services/localDataService';
+import { localDataService, FTM_STORAGE_KEYS, DEMO_TOURNAMENT_ID } from './services/localDataService';
 import { Team, Match, Player, Goal, ManOfTheMatch, POTMPoll } from './types/tournament';
 import { Tournament } from './types/multiTenant';
+import { isSupabaseConfigured, supabase } from './lib/supabase';
+
+
+
 import { 
   calculateStandings, 
   getTopScorers, 
@@ -22,6 +26,10 @@ import { MatchDetailPage } from './pages/MatchDetailPage';
 import { RulesPage } from './pages/RulesPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
+import { LandingPage } from './pages/LandingPage';
+import { CreateTournamentWizard } from './components/wizard/CreateTournamentWizard';
+import { OrganizerWorkspacePage } from './pages/OrganizerWorkspacePage';
+import { PublicTournamentPage } from './pages/PublicTournamentPage';
 import { AdminAuthGuard } from './components/AdminAuthGuard';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { PlayerProfileModal } from './components/PlayerProfileModal';
@@ -32,58 +40,72 @@ import { AccessCodeModal } from './components/AccessCodeModal';
 import { Analytics } from '@vercel/analytics/react';
 import { Trophy, Plus, RefreshCw } from 'lucide-react';
 
-
 export interface RouteState {
   tab: string;
   param?: string;
   tourneySlug?: string;
 }
 
-export const parseCurrentRoute = (): RouteState => {
-  if (typeof window === 'undefined') return { tab: 'home' };
+const parseCurrentRoute = (): RouteState => {
+  if (typeof window === 'undefined') return { tab: 'landing' };
 
-  // 1. Check URL hash (e.g. #/t/slug/matches, #/admin/login)
+  // 1. Check URL hash (e.g. #/t/slug, #/workspace, #/organize)
   const hashRaw = window.location.hash.replace(/^#\/?/, '').trim();
   if (hashRaw && hashRaw !== 'quick-view') {
     if (hashRaw.startsWith('t/')) {
       const parts = hashRaw.split('/');
-      return { tourneySlug: parts[1], tab: parts[2] || 'home', param: parts[3] };
+      return { tourneySlug: parts[1], tab: 'public-tournament', param: parts[2] };
+    }
+    if (hashRaw === 'organize' || hashRaw === 'setup' || hashRaw === 'wizard') {
+      return { tab: 'organize' };
+    }
+    if (hashRaw === 'workspace' || hashRaw === 'admin') {
+      return { tab: 'workspace' };
     }
     if (hashRaw === 'admin/login' || hashRaw === 'admin-login') {
       return { tab: 'admin-login' };
     }
     const [hTab, hParam] = hashRaw.split('/');
-    if (hTab === 'admin' && hParam === 'login') {
-      return { tab: 'admin-login' };
-    }
-    if (['home', 'matches', 'fixtures', 'results', 'match-detail', 'teams', 'team-detail', 'stats', 'table', 'rules', 'admin', 'admin-login'].includes(hTab)) {
+    if (['home', 'matches', 'fixtures', 'results', 'match-detail', 'teams', 'team-detail', 'stats', 'table', 'rules', 'landing', 'workspace', 'organize'].includes(hTab)) {
       return { tab: hTab, param: hParam };
     }
   }
 
-  // 2. Check URL pathname (e.g. /t/slug/matches, /admin)
+  // 2. Check URL pathname (e.g. /t/slug, /workspace, /organize)
   const pathname = window.location.pathname.replace(/^\/+|\/+$/g, '').trim();
   if (pathname) {
     if (pathname.startsWith('t/')) {
       const parts = pathname.split('/');
-      return { tourneySlug: parts[1], tab: parts[2] || 'home', param: parts[3] };
+      return { tourneySlug: parts[1], tab: 'public-tournament', param: parts[2] };
+    }
+    if (pathname === 'organize' || pathname === 'setup' || pathname === 'wizard') {
+      return { tab: 'organize' };
+    }
+    if (pathname === 'workspace' || pathname === 'admin') {
+      return { tab: 'workspace' };
     }
     if (pathname === 'admin/login' || pathname === 'admin-login') {
       return { tab: 'admin-login' };
     }
     const [pTab, pParam] = pathname.split('/');
-    if (pTab === 'admin') {
-      if (pParam === 'login') {
-        return { tab: 'admin-login' };
-      }
-      return { tab: 'admin' };
-    }
-    if (['home', 'matches', 'fixtures', 'results', 'match-detail', 'teams', 'team-detail', 'stats', 'table', 'rules'].includes(pTab)) {
+    if (['home', 'matches', 'fixtures', 'results', 'match-detail', 'teams', 'team-detail', 'stats', 'table', 'rules', 'landing', 'workspace', 'organize'].includes(pTab)) {
       return { tab: pTab, param: pParam };
     }
   }
 
-  return { tab: 'home' };
+  // 3. Returning users: Automatically reopen last joined tournament if no explicit route requested
+  const lastJoined = localDataService.getLastJoinedTournament();
+  if (lastJoined && lastJoined.id) {
+    const found = localDataService.getTournamentById(lastJoined.id) ||
+                  (lastJoined.slug ? localDataService.getTournamentBySlug(lastJoined.slug) : null);
+    if (!found || localDataService.isTournamentExpiredOrDeleted(found).isExpired || localDataService.isTournamentExpiredOrDeleted(found).isDeleted) {
+      localDataService.clearLastJoinedTournament();
+      return { tab: 'landing', param: 'expired' };
+    }
+    return { tab: 'public-tournament', tourneySlug: found.slug || undefined };
+  }
+
+  return { tab: 'landing' };
 };
 
 export function App() {
@@ -98,6 +120,16 @@ export function App() {
     if (initialNav.tourneySlug) {
       const found = localDataService.getTournamentBySlug(initialNav.tourneySlug);
       if (found) {
+        localDataService.setActiveTournamentId(found.id);
+        localDataService.setLastJoinedTournament(found.id, found.slug || undefined);
+        return found;
+      }
+    }
+    const lastJoined = localDataService.getLastJoinedTournament();
+    if (lastJoined && lastJoined.id) {
+      const found = localDataService.getTournamentById(lastJoined.id) ||
+                    (lastJoined.slug ? localDataService.getTournamentBySlug(lastJoined.slug) : null);
+      if (found && !localDataService.isTournamentExpiredOrDeleted(found).isExpired && !localDataService.isTournamentExpiredOrDeleted(found).isDeleted) {
         localDataService.setActiveTournamentId(found.id);
         return found;
       }
@@ -118,35 +150,29 @@ export function App() {
   });
 
 
-  // Intro state: Show animation at first when the site is opened
+  // Intro state: Only show if explicitly requested in URL parameter (?intro=true)
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('intro') === 'true') return true;
-    if (urlParams.get('nointro') === 'true' || urlParams.get('skipIntro') === 'true' || urlParams.get('view') === 'full') {
-      return false;
-    }
-    
-    // Don't show intro if directly opening admin
-    const route = parseCurrentRoute();
-    if (route.tab === 'admin' || route.tab === 'admin-login') {
-      return false;
-    }
-    
-    // Check if dismissed in this specific browsing session
-    const seenInSession = sessionStorage.getItem('ftm_dev_intro_played_session');
-    if (seenInSession === 'true') {
-      return false;
-    }
-    
-    return true;
+    return urlParams.get('intro') === 'true';
   });
+
+  // Wizard initial data passed from organizer sign up
+  const [wizardInitialData, setWizardInitialData] = useState<{
+    name?: string;
+    description?: string;
+    visibility?: 'PUBLIC' | 'PRIVATE';
+  } | undefined>(undefined);
 
   // Admin auth & session state
   const [isAuthLoading] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
     return localDataService.isDevAdminLoggedIn();
   });
+
+  // Tournament not found state for shared links
+  const [tournamentNotFound, setTournamentNotFound] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Core Tournament Data
   const [teams, setTeams] = useState<Team[]>([]);
@@ -158,18 +184,47 @@ export function App() {
   const [loading, setLoading] = useState(true);
 
   // Load data function for active tournament
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (explicitTourneyId?: string) => {
     try {
-      const tourney = localDataService.getActiveTournament();
-      setActiveTournament(tourney);
+      const route = parseCurrentRoute();
+      let tourney: Tournament | null = null;
+      const requestedSlug = route.tourneySlug;
+      
+      if (explicitTourneyId) {
+        tourney = await tournamentService.getTournament(explicitTourneyId);
+      } else if (requestedSlug) {
+        tourney = await tournamentService.getTournament(requestedSlug);
+      }
+
+      if (requestedSlug && !explicitTourneyId) {
+        if (!tourney || localDataService.isTournamentExpiredOrDeleted(tourney).isExpired || localDataService.isTournamentExpiredOrDeleted(tourney).isDeleted) {
+          setTournamentNotFound(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setTournamentNotFound(false);
+
+      if (!tourney) {
+        tourney = localDataService.getActiveTournament();
+      }
+
+      if (tourney) {
+        localDataService.registerTournament(tourney);
+        localDataService.setActiveTournamentId(tourney.id);
+        setActiveTournament(tourney);
+      }
+
+      const activeId = tourney?.id || localDataService.getActiveTournamentId();
 
       const [tData, mData, pData, gData, motmData, pollsData] = await Promise.all([
-        tournamentService.getTeams(),
-        tournamentService.getMatches(),
-        tournamentService.getPlayers(),
-        tournamentService.getGoals(),
-        tournamentService.getManOfTheMatches(),
-        tournamentService.getPolls(),
+        tournamentService.getTeams(activeId),
+        tournamentService.getMatches(activeId),
+        tournamentService.getPlayers(activeId),
+        tournamentService.getGoals(activeId),
+        tournamentService.getManOfTheMatches(activeId),
+        tournamentService.getPolls(activeId),
       ]);
 
       setTeams(tData);
@@ -178,9 +233,10 @@ export function App() {
       setGoals(gData);
       setMotms(motmData);
       setActivePolls(pollsData.filter(p => p.status === 'active'));
-      setSessionRole(localDataService.getSessionRole(tourney.id));
+      if (tourney) {
+        setSessionRole(localDataService.getSessionRole(tourney.id));
+      }
     } catch (err) {
-
       console.error('Error fetching tournament data:', err);
     } finally {
       setLoading(false);
@@ -191,23 +247,61 @@ export function App() {
     loadData();
   }, [loadData]);
 
+  // Supabase Auth session restoration and listener
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setIsAdminLoggedIn(true);
+          setCurrentUserId(session.user.id);
+        }
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setIsAdminLoggedIn(true);
+          setCurrentUserId(session.user.id);
+        } else {
+          setIsAdminLoggedIn(localDataService.isDevAdminLoggedIn());
+          setCurrentUserId(null);
+        }
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, []);
+
+
   // Handle tournament change
-  const handleTournamentChanged = useCallback((tourneyId: string) => {
+  const handleTournamentChanged = useCallback(async (tourneyId: string) => {
     localDataService.setActiveTournamentId(tourneyId);
-    const updated = localDataService.getActiveTournament();
-    setActiveTournament(updated);
-    loadData();
+    const updated = await tournamentService.getTournament(tourneyId);
+    if (updated) {
+      localDataService.registerTournament(updated);
+      setActiveTournament(updated);
+    }
+    await loadData(tourneyId);
   }, [loadData]);
 
   // Listen for browser popstate and hash changes
   useEffect(() => {
-    const handleUrlChange = () => {
+    const handleUrlChange = async () => {
       const route = parseCurrentRoute();
       if (route.tourneySlug) {
-        const found = localDataService.getTournamentBySlug(route.tourneySlug);
-        if (found && found.id !== localDataService.getActiveTournamentId()) {
-          handleTournamentChanged(found.id);
+        const found = await tournamentService.getTournament(route.tourneySlug);
+        if (found && !localDataService.isTournamentExpiredOrDeleted(found).isExpired && !localDataService.isTournamentExpiredOrDeleted(found).isDeleted) {
+          setTournamentNotFound(false);
+          localDataService.registerTournament(found);
+          localDataService.setActiveTournamentId(found.id);
+          setActiveTournament(found);
+          await loadData(found.id);
+        } else {
+          setTournamentNotFound(true);
         }
+      } else {
+        setTournamentNotFound(false);
       }
       setCurrentTab(route.tab);
       setActiveParam(route.param);
@@ -219,9 +313,9 @@ export function App() {
       window.removeEventListener('popstate', handleUrlChange);
       window.removeEventListener('hashchange', handleUrlChange);
     };
-  }, [handleTournamentChanged]);
+  }, [handleTournamentChanged, loadData]);
 
-  const handleNavigate = (tab: string, param?: string) => {
+  const handleNavigate = useCallback((tab: string, param?: string) => {
     let normalizedTab = tab;
     if (tab === 'admin/login') {
       normalizedTab = 'admin-login';
@@ -242,10 +336,16 @@ export function App() {
     // Determine target URL path with tournament slug
     const tourneySlug = activeTournament?.slug || 'tournx-championship';
     let targetPath = `/t/${tourneySlug}`;
-    if (normalizedTab === 'admin') {
-      targetPath = '/admin';
+    if (normalizedTab === 'landing') {
+      targetPath = '/';
+    } else if (normalizedTab === 'organize' || normalizedTab === 'setup' || normalizedTab === 'wizard') {
+      targetPath = '/organize';
+    } else if (normalizedTab === 'workspace' || normalizedTab === 'admin') {
+      targetPath = '/workspace';
     } else if (normalizedTab === 'admin-login') {
       targetPath = '/admin/login';
+    } else if (normalizedTab === 'public-tournament') {
+      targetPath = `/t/${tourneySlug}`;
     } else if (normalizedTab === 'matches' || normalizedTab === 'fixtures' || normalizedTab === 'results') {
       targetPath = `/t/${tourneySlug}/matches`;
     } else if (normalizedTab === 'teams') {
@@ -259,7 +359,7 @@ export function App() {
     } else if (normalizedTab === 'team-detail') {
       targetPath = param ? `/team-detail/${param}` : `/t/${tourneySlug}/teams`;
     } else {
-      targetPath = `/t/${tourneySlug}`;
+      targetPath = `/`;
     }
 
     try {
@@ -271,7 +371,29 @@ export function App() {
     } catch {}
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [activeTournament]);
+
+  // Handle tournament deletion: update active tournament, clear last joined pointer, reload data, and navigate landing
+  const handleTournamentDeleted = useCallback(async (nextTournamentId: string) => {
+    localDataService.clearLastJoinedTournament();
+    localDataService.setActiveTournamentId(nextTournamentId);
+    const nextTourney = (await tournamentService.getTournament(nextTournamentId)) || localDataService.getActiveTournament();
+    setActiveTournament(nextTourney);
+    setSessionRole(localDataService.getSessionRole(nextTourney.id));
+    await loadData(nextTournamentId);
+    handleNavigate('landing');
+  }, [loadData, handleNavigate]);
+
+  // Handle participant leave: clear device last joined session, reset to fallback demo, and navigate landing
+  const handleParticipantLeave = useCallback(async () => {
+    localDataService.clearLastJoinedTournament();
+    const demo = localDataService.getTournamentById(DEMO_TOURNAMENT_ID) || localDataService.getActiveTournament();
+    localDataService.setActiveTournamentId(demo.id);
+    setActiveTournament(demo);
+    setSessionRole('ANONYMOUS');
+    await loadData(demo.id);
+    handleNavigate('landing');
+  }, [loadData, handleNavigate]);
 
   const handleIntroComplete = () => {
     setShowIntro(false);
@@ -296,7 +418,7 @@ export function App() {
     if ((currentTab === 'admin-login' || currentTab === 'admin/login') && isAdminLoggedIn) {
       handleNavigate('admin');
     }
-  }, [currentTab, isAdminLoggedIn]);
+  }, [currentTab, isAdminLoggedIn, handleNavigate]);
 
   const handleAdminLogin = () => {
     localDataService.setDevAdminLoggedIn(true);
@@ -305,10 +427,16 @@ export function App() {
   };
 
   const handleAdminLogout = async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+    }
     localDataService.setDevAdminLoggedIn(false);
     setIsAdminLoggedIn(false);
     handleNavigate('admin-login');
   };
+
 
   // Compute active poll match IDs set
   const activePollMatchIds = useMemo(() => {
@@ -354,68 +482,100 @@ export function App() {
     }
 
     switch (currentTab) {
-      case 'home':
+      case 'landing':
         return (
-          <HomePage
-            teams={teams}
-            matches={matches}
-            standings={standings}
-            topScorers={topScorers}
-            players={players}
-            activePolls={activePolls}
-            onNavigate={handleNavigate}
-            onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
-            onSelectPlayer={handleSelectPlayer}
+          <LandingPage
+            activeTournament={activeTournament}
+            noticeMessage={
+              activeParam === 'expired'
+                ? 'Your previous tournament has ended or expired. Please join another tournament or create a new one below.'
+                : undefined
+            }
+            onOrganizeClick={(initialTourney) => {
+              if (initialTourney) {
+                setWizardInitialData(initialTourney);
+                handleNavigate('organize');
+              } else {
+                handleNavigate('workspace');
+              }
+            }}
+            onJoinTournament={(slug) => {
+              const found = localDataService.getTournamentBySlug(slug);
+              if (found) {
+                localDataService.setLastJoinedTournament(found.id, found.slug || undefined);
+                handleTournamentChanged(found.id);
+              }
+              handleNavigate('public-tournament');
+            }}
+            onOpenPublicDemo={() => {
+              handleNavigate('public-tournament');
+            }}
           />
         );
 
+      case 'organize':
+      case 'setup':
+      case 'wizard':
+        return (
+          <CreateTournamentWizard
+            initialData={wizardInitialData}
+            onComplete={(newTourney) => {
+              localDataService.registerTournament(newTourney);
+              localDataService.setActiveTournamentId(newTourney.id);
+              setActiveTournament(newTourney);
+              handleTournamentChanged(newTourney.id);
+              handleNavigate('workspace');
+            }}
+            onCancel={() => handleNavigate('landing')}
+          />
+        );
+
+      case 'workspace':
+      case 'admin':
+        return (
+          <AdminAuthGuard
+            isLoading={isAuthLoading}
+            isAuthenticated={isAdminLoggedIn}
+            onRedirectToLogin={() => handleNavigate('admin/login')}
+          >
+            <OrganizerWorkspacePage
+              tournament={activeTournament}
+              teams={teams}
+              matches={matches}
+              players={players}
+              standings={standings}
+              onDataChanged={loadData}
+              onNavigateHome={() => handleNavigate('landing')}
+              onTournamentDeleted={handleTournamentDeleted}
+              onLogout={handleAdminLogout}
+            />
+          </AdminAuthGuard>
+        );
+
+      case 'public-tournament':
       case 'matches':
       case 'fixtures':
       case 'results':
-        return (
-          <FixturesPage
-            matches={matches}
-            teams={teams}
-            activePollMatchIds={activePollMatchIds}
-            onNavigate={handleNavigate}
-          />
-        );
-
       case 'teams':
-        return (
-          <TeamsPage
-            standings={standings}
-            onNavigate={handleNavigate}
-          />
-        );
-
       case 'team-detail':
-        return (
-          <TeamDetailPage
-            teamId={activeParam || teams[0]?.id || ''}
-            teams={teams}
-            matches={matches}
-            standings={standings}
-            players={players}
-            goals={goals}
-            onNavigate={handleNavigate}
-            onSelectPlayer={handleSelectPlayer}
-          />
-        );
-
       case 'stats':
       case 'table':
         return (
-          <StatsPage
-            topScorers={topScorers}
-            cleanSheets={cleanSheets}
-            motmLeaderboard={motmLeaderboard}
+          <PublicTournamentPage
+            tournament={activeTournament}
             teams={teams}
             matches={matches}
-            standings={standings}
             players={players}
-            onNavigate={handleNavigate}
-            onSelectPlayer={handleSelectPlayer}
+            standings={standings}
+            topScorers={topScorers}
+            goals={goals}
+            motms={motms}
+            sessionRole={sessionRole}
+            isOrganizerLoggedIn={isVerifiedOrganizer}
+            onNavigateToWorkspace={() => handleNavigate('workspace')}
+            onNavigateHome={() => handleNavigate('landing')}
+            onLeaveTournament={handleParticipantLeave}
+            onDataChanged={loadData}
           />
         );
 
@@ -441,60 +601,143 @@ export function App() {
           />
         );
 
-      case 'admin':
-        return (
-          <AdminAuthGuard
-            isLoading={isAuthLoading}
-            isAuthenticated={isAdminLoggedIn}
-            onRedirectToLogin={() => handleNavigate('admin/login')}
-          >
-            <AdminDashboardPage
-              tournament={activeTournament}
-              teams={teams}
-              matches={matches}
-              players={players}
-              goals={goals}
-              assists={[]}
-              motms={motms}
-              standings={standings}
-              topScorers={topScorers}
-              onDataChanged={loadData}
-              onLogout={handleAdminLogout}
-              onNavigateHome={() => handleNavigate('home')}
-            />
-          </AdminAuthGuard>
-        );
-
       case 'admin-login':
       case 'admin/login':
         return (
           <AdminLoginPage
             onLoginSuccess={handleAdminLogin}
-            onNavigateHome={() => handleNavigate('home')}
+            onNavigateHome={() => handleNavigate('landing')}
           />
         );
 
       default:
         return (
-          <HomePage
-            teams={teams}
-            matches={matches}
-            standings={standings}
-            topScorers={topScorers}
-            players={players}
-            activePolls={activePolls}
-            onNavigate={handleNavigate}
-            onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
-            onSelectPlayer={handleSelectPlayer}
+          <LandingPage
+            activeTournament={activeTournament}
+            onOrganizeClick={(initialTourney) => {
+              if (initialTourney) {
+                setWizardInitialData(initialTourney);
+                handleNavigate('organize');
+              } else {
+                handleNavigate('workspace');
+              }
+            }}
+            onJoinTournament={(slug) => {
+              const found = localDataService.getTournamentBySlug(slug);
+              if (found) {
+                handleTournamentChanged(found.id);
+              }
+              handleNavigate('public-tournament');
+            }}
+            onOpenPublicDemo={() => {
+              handleNavigate('public-tournament');
+            }}
           />
         );
     }
   };
 
+  const isParticipantRoute = useMemo(() => {
+    return [
+      'public-tournament',
+      'matches',
+      'fixtures',
+      'results',
+      'teams',
+      'team-detail',
+      'stats',
+      'table',
+    ].includes(currentTab);
+  }, [currentTab]);
+
+  const isVerifiedOrganizer = useMemo(() => {
+    if (sessionRole === 'ORGANIZER') return true;
+    if (currentUserId && activeTournament?.created_by === currentUserId) return true;
+    if (isAdminLoggedIn) {
+      if (activeTournament?.id === DEMO_TOURNAMENT_ID) return true;
+      if (activeTournament?.created_by === 'dev-admin') return true;
+    }
+    return false;
+  }, [sessionRole, isAdminLoggedIn, currentUserId, activeTournament]);
+
+  // Dedicated Edge-to-Edge Participant Shell
+  if (isParticipantRoute) {
+    if (tournamentNotFound) {
+      return (
+        <div className="theme-minecraft-stadium min-h-screen w-full flex flex-col items-center justify-center p-4">
+          <div className="max-w-md w-full stadium-card p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-950/60 border border-rose-800/40 text-rose-400 flex items-center justify-center mx-auto">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-100">Tournament Unavailable</h1>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                The tournament link you entered is invalid, has expired, or was removed by its organizer.
+              </p>
+            </div>
+            <button
+              onClick={() => handleNavigate('landing')}
+              className="w-full py-2.5 stadium-block-btn text-xs font-semibold cursor-pointer"
+            >
+              Return to TournX Home
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen w-full bg-[#0b110e] text-[#f1f5f9] font-sans selection:bg-emerald-900 selection:text-emerald-100 flex flex-col">
+        {showIntro && <OpeningAnimation onComplete={handleIntroComplete} />}
+        
+        <div className="flex-1 w-full">
+          {renderCurrentPage()}
+        </div>
+
+        {/* Access Code Modal (VIEW / SCORE) */}
+        <AccessCodeModal
+          isOpen={isAccessModalOpen}
+          onClose={() => setIsAccessModalOpen(false)}
+          tournament={activeTournament}
+          onSuccess={(role) => {
+            setSessionRole(role);
+            loadData();
+          }}
+        />
+
+        {/* Player Profile Modal */}
+        {selectedPlayer && (
+          <PlayerProfileModal
+            player={selectedPlayer}
+            team={selectedPlayerTeam}
+            matches={matches}
+            goals={goals}
+            motms={motms}
+            standings={standings}
+            allPlayers={players}
+            allTeams={teams}
+            onClose={handleClosePlayerModal}
+            onNavigateToTeam={teamId => handleNavigate('team-detail', teamId)}
+            onNavigateToMatch={matchId => handleNavigate('match-detail', matchId)}
+          />
+        )}
+
+        {/* In-App Live Match Window Modal */}
+        <LiveMatchModal
+          isOpen={isLiveWindowOpen}
+          onClose={() => setIsLiveWindowOpen(false)}
+        />
+
+        {/* Vercel Web Analytics */}
+        <Analytics />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#18110a] text-[#f7eed8]">
+    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
       
-      {/* Animated Opening Sequence */}
+      {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (
         <OpeningAnimation onComplete={handleIntroComplete} />
       )}
@@ -512,32 +755,32 @@ export function App() {
         sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
       />
 
-      {/* TournX Multi-Tournament Development Banner */}
-      <div className="w-full bg-[#1e293b] border-b border-[#334155] px-3 sm:px-6 py-2 text-xs text-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+      {/* TournX Development Banner */}
+      <div className="w-full bg-white border-b border-slate-200 px-4 sm:px-6 py-2 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-black px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] uppercase font-mono tracking-wider shrink-0">
+          <span className="font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[10px] uppercase font-sans tracking-wider shrink-0">
             DEV MODE
           </span>
           <button
             onClick={() => setIsSwitcherOpen(true)}
-            className="font-bold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1.5 truncate cursor-pointer"
+            className="font-bold text-slate-800 hover:text-emerald-700 flex items-center gap-1.5 truncate cursor-pointer transition"
             title="Switch tournament"
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span className="truncate">{activeTournament?.name || 'TournX Championship'}</span>
           </button>
-          <span className="text-slate-400 font-mono text-[11px] hidden sm:inline">
+          <span className="text-slate-400 text-[11px] hidden sm:inline">
             • think.prompt.organise
           </span>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
           <button
-            onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:underline cursor-pointer"
+            onClick={() => handleNavigate('organize')}
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer transition"
           >
             <Plus className="w-3 h-3" />
-            <span>New Tournament</span>
+            <span>Prompt Tournament Creator</span>
           </button>
 
           <button
@@ -545,7 +788,7 @@ export function App() {
               localDataService.resetDemoData();
               await loadData();
             }}
-            className="inline-flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200 hover:underline font-bold cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer transition"
             title="Reset demo tournament only (custom tournaments preserved)"
           >
             <RefreshCw className="w-3 h-3" />

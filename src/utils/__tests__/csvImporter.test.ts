@@ -6,7 +6,7 @@ import {
   TEAM_CSV_TEMPLATE,
   PLAYER_CSV_TEMPLATE,
 } from '../csvImporter';
-import { Team, Player } from '../../types/tournament';
+import { Team } from '../../types/tournament';
 
 describe('CSV Importer & Validator', () => {
   it('parses standard comma-separated values correctly', () => {
@@ -98,4 +98,43 @@ Invalid Jersey,Strikers FC,DEF,999,false`;
     expect(playersReport.invalidRows).toHaveLength(0);
     expect(playersReport.validRows.length).toBe(4);
   });
+
+  it('handles empty input and whitespace-only files gracefully', () => {
+    const emptyTeams = validateTeamsCSV('');
+    expect(emptyTeams.totalRows).toBe(0);
+    expect(emptyTeams.validRows).toEqual([]);
+    expect(emptyTeams.invalidRows).toEqual([]);
+
+    const whitespacePlayers = validatePlayersCSV('   \n  \r\n  ', []);
+    expect(whitespacePlayers.totalRows).toBe(0);
+    expect(whitespacePlayers.validRows).toEqual([]);
+    expect(whitespacePlayers.invalidRows).toEqual([]);
+  });
+
+  it('correctly handles non-English international characters and accents', () => {
+    const csv = `name,short_name,manager
+"São Paulo FC",SPO,"Rogério Ceni"
+"Bayern München",BAY,"Thomas Müller"
+"Atlético Madrid",ATM,"Diego Simeone"`;
+
+    const report = validateTeamsCSV(csv);
+    expect(report.totalRows).toBe(3);
+    expect(report.validRows).toHaveLength(3);
+    expect(report.validRows[0].name).toBe('São Paulo FC');
+    expect(report.validRows[1].manager).toBe('Thomas Müller');
+    expect(report.validRows[2].name).toBe('Atlético Madrid');
+  });
+
+  it('rejects rows with incorrect headers or missing required columns', () => {
+    const badHeaderCsv = `random_header,another_col
+Val 1,Val 2
+Val 3,Val 4`;
+
+    const report = validateTeamsCSV(badHeaderCsv);
+    expect(report.totalRows).toBe(2);
+    expect(report.validRows).toHaveLength(0);
+    expect(report.invalidRows).toHaveLength(2);
+    expect(report.invalidRows[0].errors).toContain('Team name is required.');
+  });
 });
+

@@ -3,6 +3,8 @@ import {
   generateSingleRoundRobin,
   generateDoubleRoundRobin,
   generateSingleEliminationKnockout,
+  generateLeagueWithPlayoffs,
+  updatePlayoffSlotsFromStandings,
   advanceKnockoutResult,
   calculateDeterministicStandings,
   validateTeams,
@@ -140,7 +142,6 @@ describe('Tournament Engine — Knockout Progression & Recalculation', () => {
     const bracket = generateSingleEliminationKnockout(teams);
     const semi1 = bracket[0];
     const semi2 = bracket[1];
-    const final = bracket[2];
 
     // Play Semi 1: t1 beats t4
     const withSemi1 = advanceKnockoutResult(bracket, semi1.id, 't1');
@@ -266,4 +267,58 @@ describe('Tournament Engine — Standings & Configurable Tie-Breakers', () => {
     // Every team has played 2 matches and has 3 points
     expect(standings.every(s => s.points === 3)).toBe(true);
   });
+
+  it('generates League followed by Playoffs (top 2 direct to Final)', () => {
+    const testTeams: EngineTeam[] = [
+      { id: 't1', name: 'Alpha FC', seed: 1 },
+      { id: 't2', name: 'Beta United', seed: 2 },
+      { id: 't3', name: 'Gamma City', seed: 3 },
+      { id: 't4', name: 'Delta Rovers', seed: 4 },
+    ];
+    const res = generateLeagueWithPlayoffs(testTeams, {
+      roundRobinType: 'SINGLE',
+      qualifiersCount: 2,
+    });
+
+    expect(res.leagueMatches).toHaveLength(6);
+    expect(res.playoffMatches).toHaveLength(1);
+    expect(res.playoffMatches[0].round_name).toBe('Final');
+    expect(res.allMatches).toHaveLength(7);
+  });
+
+  it('generates League followed by Playoffs (top 4 to Semifinals and Final)', () => {
+    const testTeams: EngineTeam[] = [
+      { id: 't1', name: 'Alpha FC', seed: 1 },
+      { id: 't2', name: 'Beta United', seed: 2 },
+      { id: 't3', name: 'Gamma City', seed: 3 },
+      { id: 't4', name: 'Delta Rovers', seed: 4 },
+    ];
+    const res = generateLeagueWithPlayoffs(testTeams, {
+      roundRobinType: 'SINGLE',
+      qualifiersCount: 4,
+      includeThirdPlace: true,
+    });
+
+    expect(res.leagueMatches).toHaveLength(6);
+    // 2 Semifinals + 1 3rd place + 1 Final = 4 playoff matches
+    expect(res.playoffMatches).toHaveLength(4);
+    expect(res.allMatches).toHaveLength(10);
+
+    const standings = [
+      { position: 1, team_id: 't1', team_name: 'Alpha FC', played: 3, won: 3, drawn: 0, lost: 0, goals_for: 5, goals_against: 0, goal_difference: 5, points: 9, form: ['W', 'W', 'W'] as any },
+      { position: 2, team_id: 't2', team_name: 'Beta United', played: 3, won: 2, drawn: 0, lost: 1, goals_for: 4, goals_against: 2, goal_difference: 2, points: 6, form: ['W', 'W', 'L'] as any },
+      { position: 3, team_id: 't3', team_name: 'Gamma City', played: 3, won: 1, drawn: 0, lost: 2, goals_for: 2, goals_against: 4, goal_difference: -2, points: 3, form: ['W', 'L', 'L'] as any },
+      { position: 4, team_id: 't4', team_name: 'Delta Rovers', played: 3, won: 0, drawn: 0, lost: 3, goals_for: 1, goals_against: 6, goal_difference: -5, points: 0, form: ['L', 'L', 'L'] as any },
+    ];
+
+    const updated = updatePlayoffSlotsFromStandings(res.playoffMatches, standings);
+    const sf1 = updated.find(m => m.round_name?.includes('Semi-Final 1'));
+    const sf2 = updated.find(m => m.round_name?.includes('Semi-Final 2'));
+
+    expect(sf1?.home_team_id).toBe('t1'); // 1st
+    expect(sf1?.away_team_id).toBe('t4'); // 4th
+    expect(sf2?.home_team_id).toBe('t2'); // 2nd
+    expect(sf2?.away_team_id).toBe('t3'); // 3rd
+  });
 });
+

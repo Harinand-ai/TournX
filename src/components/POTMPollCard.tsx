@@ -25,7 +25,6 @@ export const POTMPollCard: React.FC<POTMPollCardProps> = ({
   const [votingLoading, setVotingLoading] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [hasVotedCandidateId, setHasVotedCandidateId] = useState<string | null>(null);
-  const [voteSuccessMessage, setVoteSuccessMessage] = useState<string | null>(null);
 
   const playersMap = new Map(players.map(p => [p.id, p]));
   const teamsMap = new Map(teams.map(t => [t.id, t]));
@@ -86,7 +85,6 @@ export const POTMPollCard: React.FC<POTMPollCardProps> = ({
         try {
           localStorage.setItem(`ftm_dev_potm_voted_${poll.id}`, selectedCandidateId);
         } catch {}
-        setVoteSuccessMessage('Vote submitted successfully! Thank you for voting.');
         const updatedVotes = await tournamentService.getVotes(poll.id);
         setVotes(updatedVotes);
         if (onVoteCast) onVoteCast();
