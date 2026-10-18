@@ -5,6 +5,9 @@ import {
   parseWorkspaceCommand,
   normalizeDateToIso,
   normalizePlayerName,
+  isValidPlayerName,
+  matchKnownTeam,
+  isKnownOrAliasedTeam,
 } from '../promptParsers';
 import { Match, Team } from '../../types/tournament';
 import { generateSingleRoundRobin } from '../../engine/tournamentEngine';
@@ -594,6 +597,178 @@ Please extract the team names, managers, player names, positions and captains, a
       const parsed = parseSquadPrompt(prompt, ['Kerala Blasters']);
       expect(parsed.squads['Kerala Blasters'].players).toHaveLength(2);
       expect(parsed.squads['Kerala Blasters'].players.map(p => p.name)).toEqual(['Adithyan Raj', 'Nikhil Das']);
+    });
+
+    it('parses four-team benchmark squad prompt correctly without corrupting Spurs or Dortmund', () => {
+      const prompt = `- Crystal Palace: Hari, Arjun, Rahul, Nikhil, Adarsh
+- Fulham: Amal, Ashik, Sinan, Vishnu, Akhil
+- Borussia Dortmund: Haris, Mrinal, Abhinav, Joel, Sreejith
+- Spurs: Anirudh, Syam, Prayag, Alan, Kevin`;
+
+      const knownTeams = [
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ];
+
+      const parsed = parseSquadPrompt(prompt, knownTeams);
+
+      expect(parsed.totalPlayersParsed).toBe(20);
+      expect(Object.keys(parsed.squads)).toHaveLength(4);
+
+      // Crystal Palace: exactly 5 players
+      const cp = parsed.squads['Crystal Palace'];
+      expect(cp).toBeDefined();
+      expect(cp.players).toHaveLength(5);
+      expect(cp.players.map(p => p.name)).toEqual(['Hari', 'Arjun', 'Rahul', 'Nikhil', 'Adarsh']);
+      expect(cp.managerName).toBeUndefined();
+
+      // Fulham: exactly 5 players
+      const fulham = parsed.squads['Fulham'];
+      expect(fulham).toBeDefined();
+      expect(fulham.players).toHaveLength(5);
+      expect(fulham.players.map(p => p.name)).toEqual(['Amal', 'Ashik', 'Sinan', 'Vishnu', 'Akhil']);
+      expect(fulham.managerName).toBeUndefined();
+
+      // Borussia Dortmund: exactly 5 players (no Spurs or Anirudh!)
+      const bvb = parsed.squads['Borussia Dortmund'];
+      expect(bvb).toBeDefined();
+      expect(bvb.players).toHaveLength(5);
+      expect(bvb.players.map(p => p.name)).toEqual(['Haris', 'Mrinal', 'Abhinav', 'Joel', 'Sreejith']);
+      expect(bvb.managerName).toBeUndefined();
+      expect(bvb.players.some(p => p.name.toLowerCase().includes('spurs'))).toBe(false);
+      expect(bvb.players.some(p => p.name.toLowerCase().includes('anirudh'))).toBe(false);
+
+      // Tottenham Hotspur (Spurs): exactly 5 players, including Anirudh
+      const spurs = parsed.squads['Tottenham Hotspur (Spurs)'];
+      expect(spurs).toBeDefined();
+      expect(spurs.players).toHaveLength(5);
+      expect(spurs.players.map(p => p.name)).toEqual(['Anirudh', 'Syam', 'Prayag', 'Alan', 'Kevin']);
+      expect(spurs.managerName).toBeUndefined();
+
+      // Managers and captains: exactly 0
+      const totalManagers = Object.values(parsed.squads).filter(s => s.managerName).length;
+      const totalCaptains = Object.values(parsed.squads).reduce(
+        (acc, s) => acc + s.players.filter(p => p.isCaptain).length,
+        0
+      );
+      expect(totalManagers).toBe(0);
+      expect(totalCaptains).toBe(0);
+    });
+
+    it('parses squad prompt with different team order (Spurs first)', () => {
+      const prompt = `- Spurs: Anirudh, Syam, Prayag, Alan, Kevin
+- Borussia Dortmund: Haris, Mrinal, Abhinav, Joel, Sreejith
+- Fulham: Amal, Ashik, Sinan, Vishnu, Akhil
+- Crystal Palace: Hari, Arjun, Rahul, Nikhil, Adarsh`;
+
+      const knownTeams = [
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ];
+
+      const parsed = parseSquadPrompt(prompt, knownTeams);
+      expect(parsed.totalPlayersParsed).toBe(20);
+      expect(parsed.squads['Tottenham Hotspur (Spurs)'].players.map(p => p.name)).toEqual([
+        'Anirudh', 'Syam', 'Prayag', 'Alan', 'Kevin'
+      ]);
+      expect(parsed.squads['Borussia Dortmund'].players.map(p => p.name)).toEqual([
+        'Haris', 'Mrinal', 'Abhinav', 'Joel', 'Sreejith'
+      ]);
+      expect(parsed.squads['Fulham'].players.map(p => p.name)).toEqual([
+        'Amal', 'Ashik', 'Sinan', 'Vishnu', 'Akhil'
+      ]);
+      expect(parsed.squads['Crystal Palace'].players.map(p => p.name)).toEqual([
+        'Hari', 'Arjun', 'Rahul', 'Nikhil', 'Adarsh'
+      ]);
+    });
+
+    it('parses squad prompt with various punctuation styles and dash separators', () => {
+      const prompt = `Crystal Palace - Hari, Arjun, Rahul, Nikhil, Adarsh
+Fulham: Amal, Ashik, Sinan, Vishnu, Akhil
+Borussia Dortmund — Haris, Mrinal, Abhinav, Joel, Sreejith
+Spurs - Anirudh, Syam, Prayag, Alan, Kevin`;
+
+      const knownTeams = [
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ];
+
+      const parsed = parseSquadPrompt(prompt, knownTeams);
+      expect(parsed.totalPlayersParsed).toBe(20);
+      expect(parsed.squads['Crystal Palace'].players).toHaveLength(5);
+      expect(parsed.squads['Fulham'].players).toHaveLength(5);
+      expect(parsed.squads['Borussia Dortmund'].players).toHaveLength(5);
+      expect(parsed.squads['Tottenham Hotspur (Spurs)'].players).toHaveLength(5);
+    });
+
+    it('parses squad prompt with club aliases (Palace, Dortmund, Tottenham)', () => {
+      const prompt = `- Palace: Hari, Arjun, Rahul, Nikhil, Adarsh
+- Fulham: Amal, Ashik, Sinan, Vishnu, Akhil
+- Dortmund: Haris, Mrinal, Abhinav, Joel, Sreejith
+- Tottenham: Anirudh, Syam, Prayag, Alan, Kevin`;
+
+      const knownTeams = [
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ];
+
+      const parsed = parseSquadPrompt(prompt, knownTeams);
+      expect(parsed.totalPlayersParsed).toBe(20);
+      expect(parsed.squads['Crystal Palace'].players).toHaveLength(5);
+      expect(parsed.squads['Fulham'].players).toHaveLength(5);
+      expect(parsed.squads['Borussia Dortmund'].players).toHaveLength(5);
+      expect(parsed.squads['Tottenham Hotspur (Spurs)'].players).toHaveLength(5);
+    });
+
+    it('extracts managers and captains only when explicitly declared, reporting unassigned when missing', () => {
+      const promptWithExplicitRoles = `- Crystal Palace: Hari (Captain), Arjun, Rahul, Nikhil, Adarsh. Manager: Oliver Glasner
+- Fulham: Amal, Ashik, Sinan, Vishnu, Akhil. Manager: None
+- Borussia Dortmund: Haris, Mrinal, Abhinav, Joel, Sreejith
+- Spurs: Anirudh (C), Syam, Prayag, Alan, Kevin. Coach: Ange`;
+
+      const knownTeams = [
+        'Crystal Palace',
+        'Fulham',
+        'Borussia Dortmund',
+        'Tottenham Hotspur (Spurs)',
+      ];
+
+      const parsed = parseSquadPrompt(promptWithExplicitRoles, knownTeams);
+      expect(parsed.squads['Crystal Palace'].managerName).toBe('Oliver Glasner');
+      expect(parsed.squads['Crystal Palace'].players.find(p => p.name === 'Hari')?.isCaptain).toBe(true);
+
+      // Fulham: "Manager: None" -> should be undefined/unassigned, not "None"
+      expect(parsed.squads['Fulham'].managerName).toBeUndefined();
+
+      // Dortmund: missing manager and captain -> undefined, all isCaptain false
+      expect(parsed.squads['Borussia Dortmund'].managerName).toBeUndefined();
+      expect(parsed.squads['Borussia Dortmund'].players.every(p => !p.isCaptain)).toBe(true);
+
+      // Spurs: Coach: Ange -> managerName: Ange, Anirudh -> isCaptain: true
+      expect(parsed.squads['Tottenham Hotspur (Spurs)'].managerName).toBe('Ange');
+      expect(parsed.squads['Tottenham Hotspur (Spurs)'].players.find(p => p.name === 'Anirudh')?.isCaptain).toBe(true);
+    });
+
+    it('never accepts a team name or alias as a player name', () => {
+      const knownTeams = ['Crystal Palace', 'Fulham', 'Borussia Dortmund', 'Tottenham Hotspur (Spurs)'];
+      expect(isValidPlayerName('Spurs', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Tottenham', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Crystal Palace', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Fulham', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Borussia Dortmund', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Dortmund', knownTeams)).toBe(false);
+      expect(isValidPlayerName('BVB', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Spurs: Anirudh', knownTeams)).toBe(false);
+      expect(isValidPlayerName('Anirudh', knownTeams)).toBe(true);
+      expect(isValidPlayerName('Hari', knownTeams)).toBe(true);
     });
   });
 

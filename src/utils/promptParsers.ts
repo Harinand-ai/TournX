@@ -211,6 +211,120 @@ export function normalizeTeamName(raw: string): string {
     .join(' ');
 }
 
+/**
+ * Resolves a candidate team string against a list of known teams.
+ * Checks:
+ * 1. Exact match (case-insensitive)
+ * 2. Prefix-stripped match ("Team X", "The X", "1. X")
+ * 3. Parenthetical breakdown of known teams (e.g. "Tottenham Hotspur (Spurs)" matches "Spurs" or "Tottenham Hotspur")
+ * 4. Football club aliases (e.g. "Spurs" -> "Tottenham Hotspur (Spurs)", "Dortmund" -> "Borussia Dortmund")
+ * 5. Reverse alias matching (if knownTeam is "Spurs", candidate "Tottenham Hotspur" also matches)
+ */
+export function matchKnownTeam(candidate: string, knownTeams: string[]): string | null {
+  if (!candidate || !knownTeams || knownTeams.length === 0) return null;
+  const candLower = candidate.toLowerCase().trim();
+  if (!candLower) return null;
+
+  // 1. Direct exact match (case-insensitive)
+  for (const kt of knownTeams) {
+    if (kt.toLowerCase().trim() === candLower) return kt;
+  }
+
+  // 2. Strip leading numbers, bullets, prefixes ("team", "the")
+  const strippedCand = candLower
+    .replace(/^[-*•\d+.)\s—–:]+/, '')
+    .replace(/^(?:team\s+|the\s+)/i, '')
+    .trim();
+  for (const kt of knownTeams) {
+    const strippedKt = kt.toLowerCase().replace(/^(?:team\s+|the\s+)/i, '').trim();
+    if (strippedKt === strippedCand && strippedCand.length > 1) return kt;
+  }
+
+  // 3. Parenthetical breakdown of known teams (e.g. "Tottenham Hotspur (Spurs)")
+  for (const kt of knownTeams) {
+    const pMatch = kt.match(/^([^(]+)\s*\(([^)]+)\)$/);
+    if (pMatch) {
+      const mainPart = pMatch[1].trim().toLowerCase();
+      const insidePart = pMatch[2].trim().toLowerCase();
+      if (candLower === mainPart || candLower === insidePart || strippedCand === mainPart || strippedCand === insidePart) {
+        return kt;
+      }
+    }
+
+    // Vice versa if candidate has parentheses
+    const candPMatch = candidate.match(/^([^(]+)\s*\(([^)]+)\)$/);
+    if (candPMatch) {
+      const candMain = candPMatch[1].trim().toLowerCase();
+      const candInside = candPMatch[2].trim().toLowerCase();
+      if (kt.toLowerCase() === candMain || kt.toLowerCase() === candInside) {
+        return kt;
+      }
+    }
+  }
+
+  // 4. Normalized alias lookup (via FOOTBALL_CLUB_ALIASES and normalizeTeamName)
+  const normCand = normalizeTeamName(candidate).toLowerCase();
+  for (const kt of knownTeams) {
+    if (normalizeTeamName(kt).toLowerCase() === normCand) return kt;
+  }
+
+  // 5. Check if candidate or stripped candidate is in FOOTBALL_CLUB_ALIASES
+  const aliasResolved = FOOTBALL_CLUB_ALIASES[candLower] || FOOTBALL_CLUB_ALIASES[strippedCand];
+  if (aliasResolved) {
+    for (const kt of knownTeams) {
+      if (kt.toLowerCase() === aliasResolved.toLowerCase() || normalizeTeamName(kt).toLowerCase() === normalizeTeamName(aliasResolved).toLowerCase()) {
+        return kt;
+      }
+      const pMatch = kt.match(/^([^(]+)\s*\(([^)]+)\)$/);
+      if (pMatch) {
+        const inside = pMatch[2].trim().toLowerCase();
+        const main = pMatch[1].trim().toLowerCase();
+        if (aliasResolved.toLowerCase().includes(inside) || aliasResolved.toLowerCase().includes(main)) {
+          return kt;
+        }
+      }
+    }
+  }
+
+  // 6. Check reverse: for each kt, check if any alias maps to kt
+  for (const kt of knownTeams) {
+    const ktNorm = normalizeTeamName(kt).toLowerCase();
+    for (const [aliasKey, aliasVal] of Object.entries(FOOTBALL_CLUB_ALIASES)) {
+      if (aliasVal.toLowerCase() === kt.toLowerCase() || normalizeTeamName(aliasVal).toLowerCase() === ktNorm) {
+        if (aliasKey === candLower || aliasKey === strippedCand) {
+          return kt;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Checks whether a candidate string is a known team or recognized football club alias.
+ */
+export function isKnownOrAliasedTeam(candidate: string, knownTeams: string[] = []): boolean {
+  if (!candidate) return false;
+  const candLower = candidate.toLowerCase().trim();
+  if (candLower.length < 2) return false;
+
+  if (knownTeams.length > 0 && matchKnownTeam(candidate, knownTeams)) {
+    return true;
+  }
+
+  if (FOOTBALL_CLUB_ALIASES[candLower]) return true;
+  if (Object.values(FOOTBALL_CLUB_ALIASES).some(v => v.toLowerCase() === candLower)) return true;
+
+  // Check parenthetical part of any football alias (e.g. "Spurs" from "Tottenham Hotspur (Spurs)")
+  for (const v of Object.values(FOOTBALL_CLUB_ALIASES)) {
+    const p = v.match(/\(([^)]+)\)/);
+    if (p && p[1].trim().toLowerCase() === candLower) return true;
+  }
+
+  return false;
+}
+
 export function normalizeVenueName(raw: string): string {
   const cleaned = raw.trim().replace(/^["']|["']$/g, '').replace(/^(?:the\s+)/i, '').trim();
   return cleaned
@@ -870,16 +984,21 @@ export function isValidPlayerName(name: string, knownTeams: string[] = []): bool
 
   const lower = name.toLowerCase().trim();
 
-  // Reject if it matches any known team name (case-insensitive)
-  if (knownTeams.some(kt => kt.toLowerCase().trim() === lower)) {
+  // Reject if it matches any known team or club alias
+  if (isKnownOrAliasedTeam(name, knownTeams)) {
     return false;
   }
 
-  // Reject if it looks like a team heading (e.g. "Team Alpha", "1. Kerala Blasters")
+  // Reject if it looks like a team heading (e.g. "Team Alpha", "1. Kerala Blasters", "Spurs:")
+  const cleanCandidate = lower.replace(/^[-*•\d+.)\s—–:]+/, '').replace(/[:—–\-].*$/, '').trim();
+  if (cleanCandidate && isKnownOrAliasedTeam(cleanCandidate, knownTeams)) {
+    return false;
+  }
+
   const teamHeadingMatch = lower.match(/^(?:\d+[\.\)]\s*)?(?:team\s+)?([a-z0-9\s'&.-]+)$/i);
   if (teamHeadingMatch) {
     const candidateTeam = teamHeadingMatch[1].trim();
-    if (knownTeams.some(kt => kt.toLowerCase().trim() === candidateTeam)) {
+    if (isKnownOrAliasedTeam(candidateTeam, knownTeams)) {
       return false;
     }
   }
@@ -951,95 +1070,152 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
 
   // Helper to add occurrence without overlap
   const addOccurrence = (teamName: string, index: number, matchLength: number) => {
-    // Canonicalize to existing known team if matched
-    const lower = teamName.toLowerCase().trim();
-    const canon = canonicalTeamMap[lower] ||
-      canonicalTeamMap[lower.replace(/^(?:\d+[\.\)]\s*)?(?:team\s+|the\s+)?/i, '').trim()] ||
+    const matched = matchKnownTeam(teamName, knownTeams);
+    const canon = matched ||
+      canonicalTeamMap[teamName.toLowerCase().trim()] ||
       teamName;
 
     // Avoid duplicate or overlapping matches
-    const exists = occurrences.some(o => Math.abs(o.index - index) < Math.max(matchLength, 6));
-    if (!exists) {
+    const existingIdx = occurrences.findIndex(o => Math.abs(o.index - index) < Math.max(matchLength, 6));
+    if (existingIdx >= 0) {
+      if (matchLength > occurrences[existingIdx].matchLength) {
+        occurrences[existingIdx] = { teamName: canon, index, matchLength };
+      }
+    } else {
       occurrences.push({ teamName: canon, index, matchLength });
     }
   };
 
-  // 1. Look for known teams occurrences (handling markdown, numbers, prefixes like "For", "In", "Team", colons, dashes)
+  // 1. Build search terms for all known teams (including aliases, short names, and parenthetical forms)
   if (knownTeams.length > 0) {
+    const teamSearchTerms: { term: string; canonical: string }[] = [];
     knownTeams.forEach(kt => {
-      const escaped = kt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      teamSearchTerms.push({ term: kt, canonical: kt });
 
-      // Header line pattern: e.g. "**1. Kerala Blasters**", "### 2. Bengaluru FC", "1. Kerala Blasters:"
-      const headerRegex = new RegExp(`(?:^|\\n)\\s*(?:[*#_~]{1,6}\\s*)?(?:\\d+[\\.\\)]\\s*)?(?:(?:for|in|team)\\s+)?(${escaped})(?:[*_~]{1,6})?\\s*(?:[:\\-–—]|\\n|$)`, 'gi');
-      let hm: RegExpExecArray | null;
-      while ((hm = headerRegex.exec(text)) !== null) {
-        addOccurrence(kt, hm.index, hm[0].length);
+      // Parenthetical parts: e.g. "Tottenham Hotspur (Spurs)" -> "Tottenham Hotspur", "Spurs"
+      const pMatch = kt.match(/^([^(]+)\s*\(([^)]+)\)$/);
+      if (pMatch) {
+        teamSearchTerms.push({ term: pMatch[1].trim(), canonical: kt });
+        teamSearchTerms.push({ term: pMatch[2].trim(), canonical: kt });
       }
 
-      // Conversational prefix pattern: e.g. "For Kerala Blasters, add...", "Team Kerala Blasters is managed by..."
+      // Prefixes stripped
+      const stripped = kt.replace(/^(?:team\s+|the\s+)/i, '').trim();
+      if (stripped !== kt && stripped.length > 1) {
+        teamSearchTerms.push({ term: stripped, canonical: kt });
+      }
+
+      // Look up aliases from FOOTBALL_CLUB_ALIASES
+      const ktNorm = normalizeTeamName(kt).toLowerCase();
+      for (const [aliasKey, aliasVal] of Object.entries(FOOTBALL_CLUB_ALIASES)) {
+        if (aliasVal.toLowerCase() === kt.toLowerCase() || normalizeTeamName(aliasVal).toLowerCase() === ktNorm) {
+          teamSearchTerms.push({ term: aliasKey, canonical: kt });
+        }
+      }
+    });
+
+    // Sort terms by length descending to match longest phrases first
+    teamSearchTerms.sort((a, b) => b.term.length - a.term.length);
+
+    teamSearchTerms.forEach(({ term, canonical }) => {
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Header line pattern: e.g. "- Spurs:", "* Spurs -", "1. Spurs:", "### Spurs", "Spurs:"
+      const headerRegex = new RegExp(
+        `(?:^|\\n)\\s*(?:[-*•_~#]{1,6}\\s*|\\d+[\\.\\)]\\s*)?(?:(?:for|in|team|the)\\s+)?(${escaped})(?:[*_~]{1,6})?\\s*(?:[:\\-–—]|\\n|$)`,
+        'gi'
+      );
+      let hm: RegExpExecArray | null;
+      while ((hm = headerRegex.exec(text)) !== null) {
+        addOccurrence(canonical, hm.index, hm[0].length);
+      }
+
+      // Conversational prefix pattern: e.g. "For Spurs, add...", "Team Spurs is managed by..."
       const convRegex = new RegExp(`(?:^|\\n|[.;]\\s*)(?:for|in|team)\\s+(${escaped})(?=[.,;:\\s\\n]|$)`, 'gi');
       let cm: RegExpExecArray | null;
       while ((cm = convRegex.exec(text)) !== null) {
-        addOccurrence(kt, cm.index, cm[0].length);
+        addOccurrence(canonical, cm.index, cm[0].length);
       }
 
-      // Inline colon pattern: e.g. "Kerala Blasters: Daniel (GK)..."
-      const colonRegex = new RegExp(`(?:^|\\n)\\s*(${escaped})\\s*[:\\-–—]`, 'gi');
+      // Inline colon pattern: e.g. "Spurs: Anirudh..."
+      const colonRegex = new RegExp(`(?:^|\\n)\\s*(?:[-*•_~#]{1,6}\\s*)?(${escaped})\\s*[:\\-–—]`, 'gi');
       let clm: RegExpExecArray | null;
       while ((clm = colonRegex.exec(text)) !== null) {
-        addOccurrence(kt, clm.index, clm[0].length);
-      }
-
-      // General boundary fallback if not yet matched
-      if (!occurrences.some(o => o.teamName.toLowerCase() === kt.toLowerCase())) {
-        const boundaryRegex = new RegExp(`(?:^|[\\r\\n\\s*#_~\`"\'\\(\\)\\[\\]\\-:.,;])(?:for|in|team\\s+)?(${escaped})(?=[\\r\\n\\s*#_~\`"\'\\(\\)\\[\\]\\-:.,;]|$)`, 'gi');
-        let bm: RegExpExecArray | null;
-        while ((bm = boundaryRegex.exec(text)) !== null) {
-          addOccurrence(kt, bm.index, bm[0].length);
-        }
+        addOccurrence(canonical, clm.index, clm[0].length);
       }
     });
   }
 
-  // 2. Discover team boundaries from text ONLY IF knownTeams is empty or no known teams were found
-  if (occurrences.length === 0) {
-    // e.g. "**1. Kerala Blasters**", "### Bengaluru FC", "1. Team Alpha"
-    const markdownHeaderRegex = /(?:^|\n)\s*(?:\*{1,3}|#{1,6}\s*|\d+[\.\)]\s*)(?:Team\s+)?([A-Za-z0-9\s'&.-]{2,35}?)(?:\*{1,3})?\s*[:\-–—]?\s*(?=\n\s*(?:Manager|Coach|[-*•\d]|Goalkeeper|Keeper|GK|DEF|MID|FWD))/gi;
-    let mhm: RegExpExecArray | null;
-    while ((mhm = markdownHeaderRegex.exec(text)) !== null) {
-      const rawName = mhm[1].trim();
-      if (!isInstructionLine(rawName) && isValidPlayerName(rawName, [])) {
-        addOccurrence(rawName, mhm.index, mhm[0].length);
-      }
-    }
+  // 2. Generic team boundary detection (finds team headings in text whether knownTeams is empty or has unmatched teams)
+  // Matches e.g. "- Team Alpha: ...", "Crystal Palace: Hari, Arjun...", "Team 1: ..."
+  const genericLineRegex = /(?:^|\n)\s*(?:[-*•_~#]{1,6}\s*|\d+[\.\)]\s*)?(?:(?:team|the)\s+)?([A-Za-z0-9\s'&.-]{2,35}?)(?:[*_~]{1,6})?\s*([:\-–—])\s*([^\n]+)/gi;
+  let gm: RegExpExecArray | null;
+  while ((gm = genericLineRegex.exec(text)) !== null) {
+    const candidate = gm[1].trim();
+    const separator = gm[2];
+    const restOfLine = gm[3].trim();
 
-    // Conversational "Team Alpha is managed by...", "Team Alpha has...", "Team Alpha:"
-    const teamPrefixRegex = /(?:^|\n|[.;]\s*)(?:Team\s+)([A-Za-z0-9\s'-]{1,30}?)(?=\s+(?:is\s+managed\s+by|is\s+coached\s+by|is\s+|has\s+|players\s+are|roster\s+is|manager\s+is|squad\s+is)|:|,|\.|\n)/gi;
-    let tm: RegExpExecArray | null;
-    while ((tm = teamPrefixRegex.exec(text)) !== null) {
-      const rawName = tm[1].trim();
-      const fullName = `Team ${rawName}`;
-      addOccurrence(fullName, tm.index, tm[0].length);
-    }
+    if (isInstructionLine(candidate)) continue;
+    if (/^(?:manager|coach|captain|players?|squad|roster|substitutes?|gk|def|mid|fwd|rules?|format)$/i.test(candidate)) continue;
 
-    // "For <Team>..." or "In <Team>..."
-    const forPrefixRegex = /(?:^|\n|[.;]\s*)(?:For|In)\s+([A-Za-z0-9\s'-]{2,30}?)(?=\s+(?:add|manager|coach|players|is|roster)|:|,|\.|\n)/gi;
-    let fm: RegExpExecArray | null;
-    while ((fm = forPrefixRegex.exec(text)) !== null) {
-      const rawName = fm[1].trim();
-      if (!isInstructionLine(rawName)) {
-        addOccurrence(rawName, fm.index, fm[0].length);
+    const matched = matchKnownTeam(candidate, knownTeams);
+    if (matched) {
+      addOccurrence(matched, gm.index, gm[0].length - restOfLine.length);
+    } else {
+      // Must NOT be a player line where separator precedes a position/role:
+      // E.g. "- Adithyan Raj — Goalkeeper, Captain" or "Daniel: GK"
+      const firstWord = restOfLine.toLowerCase().replace(/[,;()]/g, ' ').split(/\s+/)[0];
+      if (POSITION_MAP[firstWord] || ['c', 'captain', 'sub', 'substitute', 'subs', 'no', 'jersey', 'number'].includes(firstWord)) {
+        continue;
       }
-    }
+      // For an unknown team, separator must be a colon ':' OR the line must start with 'Team '
+      const isExplicitTeam = /^(?:team\s+|\d+[\.\)]\s*team\s+)/i.test(gm[0]) || separator === ':';
+      if (!isExplicitTeam) {
+        continue;
+      }
 
-    // Colon prefix: "<Team>:" (must NOT start with bullet or dash)
-    const colonPrefixRegex = /(?:^|\n)\s*(?![*-•\d])([A-Za-z0-9\s'-]{2,30}?)\s*[:\-–—]\s*(?=[A-Za-z0-9\s(]+(?:GK|DEF|MID|FWD|manager|coach))/gi;
-    let cm: RegExpExecArray | null;
-    while ((cm = colonPrefixRegex.exec(text)) !== null) {
-      const rawName = cm[1].trim();
-      if (!isInstructionLine(rawName)) {
-        addOccurrence(rawName, cm.index, cm[0].length);
+      // If knownTeams was provided and non-empty, and candidate is neither an explicit 'Team X' nor in FOOTBALL_CLUB_ALIASES, don't invent new teams from player lines
+      if (knownTeams.length > 0 && !/^(?:team\s+|\d+[\.\)]\s*team\s+)/i.test(gm[0]) && !FOOTBALL_CLUB_ALIASES[candidate.toLowerCase()]) {
+        continue;
       }
+
+      const targetName = normalizeTeamName(candidate);
+      addOccurrence(targetName, gm.index, gm[0].length - restOfLine.length);
+    }
+  }
+
+  // Standalone markdown or numbered headers: e.g. "### Team Alpha\n", "**Kerala Blasters**\n"
+  const markdownHeaderRegex = /(?:^|\n)\s*(?:\*{1,3}|#{1,6}\s*|\d+[\.\)]\s*)(?:Team\s+)?([A-Za-z0-9\s'&.-]{2,35}?)(?:\*{1,3})?\s*[:\-–—]?\s*(?=\n\s*(?:Manager|Coach|[-*•\d]|Goalkeeper|Keeper|GK|DEF|MID|FWD|[A-Za-z]))/gi;
+  let mhm: RegExpExecArray | null;
+  while ((mhm = markdownHeaderRegex.exec(text)) !== null) {
+    const candidate = mhm[1].trim();
+    if (!isInstructionLine(candidate) && !/^(?:manager|coach|captain|players?|squad|roster)$/i.test(candidate)) {
+      const matched = matchKnownTeam(candidate, knownTeams);
+      const targetName = matched || normalizeTeamName(candidate);
+      addOccurrence(targetName, mhm.index, mhm[0].length);
+    }
+  }
+
+  // Conversational "Team Alpha is managed by...", "Team Alpha has...", "Team Alpha:"
+  const teamPrefixRegex = /(?:^|\n|[.;]\s*)(?:Team\s+)([A-Za-z0-9\s'-]{1,30}?)(?=\s+(?:is\s+managed\s+by|is\s+coached\s+by|is\s+|has\s+|players\s+are|roster\s+is|manager\s+is|squad\s+is)|:|,|\.|\n)/gi;
+  let tm: RegExpExecArray | null;
+  while ((tm = teamPrefixRegex.exec(text)) !== null) {
+    const rawName = tm[1].trim();
+    const fullName = `Team ${rawName}`;
+    const matched = matchKnownTeam(fullName, knownTeams) || matchKnownTeam(rawName, knownTeams);
+    const targetName = matched || normalizeTeamName(fullName);
+    addOccurrence(targetName, tm.index, tm[0].length);
+  }
+
+  // "For <Team>..." or "In <Team>..."
+  const forPrefixRegex = /(?:^|\n|[.;]\s*)(?:For|In)\s+([A-Za-z0-9\s'-]{2,30}?)(?=\s+(?:add|manager|coach|players|is|roster)|:|,|\.|\n)/gi;
+  let fm: RegExpExecArray | null;
+  while ((fm = forPrefixRegex.exec(text)) !== null) {
+    const rawName = fm[1].trim();
+    if (!isInstructionLine(rawName)) {
+      const matched = matchKnownTeam(rawName, knownTeams);
+      const targetName = matched || normalizeTeamName(rawName);
+      addOccurrence(targetName, fm.index, fm[0].length);
     }
   }
 
@@ -1143,6 +1319,20 @@ function parsePlayerToken(
 
   // If token is an obvious instruction line, reject immediately
   if (!token || token.length < 2 || isInstructionLine(token)) {
+    return null;
+  }
+
+  // If token has a team name prefix (e.g. "Spurs: Anirudh" or "Spurs — Anirudh" or "Crystal Palace: Hari"), strip the team prefix
+  const teamPrefixMatch = token.match(/^([A-Za-z0-9\s'&.-]+?)\s*[:—–\-]\s*(.+)$/);
+  if (teamPrefixMatch) {
+    const candidateTeam = teamPrefixMatch[1].trim();
+    if (isKnownOrAliasedTeam(candidateTeam, knownTeams)) {
+      token = teamPrefixMatch[2].trim();
+    }
+  }
+
+  // Reject if entire token is a team name
+  if (isKnownOrAliasedTeam(token, knownTeams)) {
     return null;
   }
 
@@ -1253,12 +1443,22 @@ function parsePlayerToken(
   // 8. Normalize player name
   pName = normalizePlayerName(pName);
 
+  // Strip internal team prefixes if any remain
+  const innerTeamPrefix = pName.match(/^([A-Za-z0-9\s'&.-]+?)\s*[:—–\-]\s*(.+)$/);
+  if (innerTeamPrefix && isKnownOrAliasedTeam(innerTeamPrefix[1].trim(), knownTeams)) {
+    pName = normalizePlayerName(innerTeamPrefix[2]);
+  }
+
   if (!pName || !isValidPlayerName(pName, knownTeams)) {
     return null;
   }
 
-  if (generalCaptainName && pName.toLowerCase().includes(generalCaptainName)) {
-    isCaptain = true;
+  if (generalCaptainName) {
+    const pNorm = pName.toLowerCase().trim();
+    const capNorm = generalCaptainName.trim();
+    if (pNorm === capNorm || pNorm.split(/\s+/).includes(capNorm)) {
+      isCaptain = true;
+    }
   }
 
   // Capitalize first letter of player name nicely if needed
@@ -1276,13 +1476,19 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
   // Strip trailing tournament instructions like "Match each player...", "Use a knockout format...", "Preserve existing data..."
   body = body.replace(/(?:\n|\.\s+)\s*(?:Match\s+each\s+|Preserve\s+|Save\s+the\s+|Flag\s+any\s+|Show\s+a\s+|Do\s+not\s+|Use\s+a\s+|Please\s+|Let\s+me\s+|Format\s+is|Schedule\s+is|Matches\s+are|The\s+event|All\s+matches|Each\s+team)[\s\S]*$/i, '.');
 
-  // 1. Extract manager if mentioned (e.g. "Manager: Arjun Nair", "is managed by Rahul Menon", "coach: Sameer")
+  // 1. Extract manager if explicitly declared (e.g. "Manager: Arjun Nair", "is managed by Rahul Menon", "coach: Sameer")
   const managerMatch = 
     body.match(/(?:(?:is\s+)?(?:managed|coached)\s+by|(?:the\s+)?(?:team\s+)?(?:manager|coach)|manager|coach)\s*(?:is|named|called|=|:)?\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|\s+and|\s+Its|\s+His|\s+Her|\s+Their|\s+Make|$)/i) ||
     body.match(/(?:manager|coach)\s*[:\-–—]\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|$)/i);
   if (managerMatch && managerMatch[1]) {
     const rawMgr = managerMatch[1].trim().replace(/^[—–\-*•:,.;\s]+|[—–\-*•:,.;\s]+$/g, '');
-    if (rawMgr && rawMgr.length >= 2 && !/^(?:is|none|tbd|the)$/i.test(rawMgr)) {
+    if (
+      rawMgr &&
+      rawMgr.length >= 2 &&
+      !/^(?:is|none|tbd|the|n\/a|na|nil|null|unassigned|no|not\s+assigned|no\s+manager|no\s+coach)$/i.test(rawMgr) &&
+      !isInstructionLine(rawMgr) &&
+      !isKnownOrAliasedTeam(rawMgr, knownTeams)
+    ) {
       squad.managerName = rawMgr;
     }
   }
@@ -1293,7 +1499,16 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
     body.match(/(?:make|appoint|set)\s+([A-Za-z0-9\s'.-]{2,35}?)\s+(?:the\s+)?captain/i) ||
     body.match(/captain\s+(?:is\s+|:\s*|=)?\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|\s+and|$)/i);
   if (captainMatch && captainMatch[1]) {
-    generalCaptainName = captainMatch[1].trim().replace(/^[—–\-*•:,.;\s]+|[—–\-*•:,.;\s]+$/g, '').toLowerCase();
+    const rawCap = captainMatch[1].trim().replace(/^[—–\-*•:,.;\s]+|[—–\-*•:,.;\s]+$/g, '');
+    if (
+      rawCap &&
+      rawCap.length >= 2 &&
+      !/^(?:is|none|tbd|the|n\/a|na|nil|null|unassigned|no|not\s+assigned|no\s+captain)$/i.test(rawCap) &&
+      !isInstructionLine(rawCap) &&
+      !isKnownOrAliasedTeam(rawCap, knownTeams)
+    ) {
+      generalCaptainName = rawCap.toLowerCase();
+    }
   }
 
   // 3. Remove manager and captain sentences before extracting player tokens
@@ -1314,6 +1529,14 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
     // where any dashes or colons separate the name from position/role details:
     const dashMatch = line.match(/^[-*•\d+.)\s]*([^\—–\-:]+?)\s*[—–\-:]\s*(.+)$/);
     if (dashMatch) {
+      const leftPart = dashMatch[1].trim();
+      // If leftPart is a known team (e.g. "Spurs: Anirudh, Syam, Prayag..."), split the right side by commas!
+      if (isKnownOrAliasedTeam(leftPart, knownTeams)) {
+        const splitTokens = splitTopLevelTokens(dashMatch[2]).filter(Boolean);
+        candidateTokens.push(...splitTokens);
+        return;
+      }
+
       // Check if right side only contains roles/positions
       const rightWords = dashMatch[2].toLowerCase().replace(/[,;()]/g, ' ').split(/\s+/).filter(Boolean);
       const isPureRole = rightWords.every(w =>

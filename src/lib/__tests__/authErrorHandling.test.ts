@@ -56,10 +56,17 @@ describe('TournX Authentication & Error Handling Hardening', () => {
   });
 
   it('resendConfirmationEmail gracefully handles execution or returns error', async () => {
-    const res = await resendConfirmationEmail('test-dev-unconfirmed@example.com');
-    expect(typeof res.success).toBe('boolean');
-    if (!res.success) {
-      expect(typeof res.error).toBe('string');
+    if (supabase) {
+      const resendSpy = vi.spyOn(supabase.auth, 'resend').mockResolvedValueOnce({
+        data: {} as any,
+        error: null,
+      });
+      const res = await resendConfirmationEmail('test-dev-unconfirmed@example.com');
+      expect(res.success).toBe(true);
+      resendSpy.mockRestore();
+    } else {
+      const res = await resendConfirmationEmail('test-dev-unconfirmed@example.com');
+      expect(res.success).toBe(false);
     }
   });
 

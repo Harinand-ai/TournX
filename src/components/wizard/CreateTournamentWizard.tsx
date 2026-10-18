@@ -24,6 +24,7 @@ import {
 import { 
   parseTournamentPrompt, 
   parseSquadPrompt, 
+  matchKnownTeam,
   ParsedTournamentDraft, 
   ParsedSquadDraft,
   ParsedTeamSquad,
@@ -250,7 +251,7 @@ export function CreateTournamentWizard({
 
     if (tournamentDraft) {
       const newTeamsToAdd = parsedTeamNames.filter(
-        pt => !tournamentDraft.teams.some(et => et.toLowerCase() === pt.toLowerCase())
+        pt => !tournamentDraft.teams.some(et => matchKnownTeam(pt, [et]) || et.toLowerCase() === pt.toLowerCase())
       );
       if (newTeamsToAdd.length > 0) {
         setTournamentDraft({
@@ -264,14 +265,14 @@ export function CreateTournamentWizard({
     setSquadRosters(prev => {
       const next = { ...prev };
       Object.entries(squadParsePreview.squads).forEach(([tName, sq]) => {
-        const matchedKey = Object.keys(next).find(k => k.toLowerCase() === tName.toLowerCase()) || tName;
+        const matchedKey = Object.keys(next).find(k => matchKnownTeam(tName, [k]) || k.toLowerCase() === tName.toLowerCase()) || tName;
         const current = next[matchedKey] || { teamName: matchedKey, managerName: '', players: [] };
 
         if (mode === 'REPLACE') {
           // Safe Draft Correction: Replace affected team's roster with verified clean players
           next[matchedKey] = {
             teamName: matchedKey,
-            managerName: sq.managerName || current.managerName,
+            managerName: sq.managerName || current.managerName || '',
             players: [...sq.players],
           };
         } else {
