@@ -32,7 +32,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
     try {
       if (isSupabaseConfigured && supabase) {
-        // Real Supabase Authentication (Phase Five)
         if (isSignUp) {
           const { data, error } = await supabase.auth.signUp({
             email: cleanEmail,
@@ -50,10 +49,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             onLoginSuccess();
           } else {
             if (data.user && data.user.identities && data.user.identities.length === 0) {
-              setInfoMsg(`An account with ${cleanEmail} already exists. Please sign in below with your password.`);
+              setInfoMsg(`An account with ${cleanEmail} already exists. Please sign in below.`);
               setIsSignUp(false);
             } else {
-              setInfoMsg(`Registration successful! A confirmation email has been sent to ${cleanEmail}. Please check your inbox, then sign in.`);
+              setInfoMsg(`Registration successful! A confirmation email has been sent to ${cleanEmail}. Please check your inbox.`);
               setIsSignUp(false);
             }
           }
@@ -78,7 +77,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               setIsUnconfirmedError(true);
               const projectHost = getSupabaseProjectHost();
               setErrorMsg(
-                `Email not confirmed for ${cleanEmail} on ${projectHost || 'Supabase'}. If you confirmed this account previously or signed in earlier, ensure you are using the correct credentials and project. If you need a new confirmation email, click below.`
+                `Email not confirmed for ${cleanEmail} on ${projectHost || 'Supabase'}. If you confirmed this account previously, check your credentials or resend the verification email below.`
               );
               return;
             }
@@ -146,12 +145,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   };
 
   return (
-    <div className="max-w-md mx-auto my-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm text-slate-900">
+    <div className="max-w-md mx-auto my-8 p-6 bg-[#0f1411] rounded-2xl border border-[#1f2e26] shadow-2xl text-[#f1f5f9] relative">
       
       {/* Back button */}
       <button
         onClick={onNavigateHome}
-        className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 transition-colors mb-6 cursor-pointer"
+        className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-slate-400 hover:text-lime-400 transition-colors mb-6 cursor-pointer"
       >
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to Tournament
@@ -159,17 +158,17 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       {/* Header */}
       <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 mx-auto flex items-center justify-center text-blue-700 mb-3">
-          <Shield className="w-6 h-6 text-blue-700" />
+        <div className="w-12 h-12 rounded-xl bg-[#141e17] border border-[#273d2f] mx-auto flex items-center justify-center text-lime-400 mb-3 shadow-sm">
+          <Shield className="w-6 h-6 text-lime-400" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-900">
-          ORGANIZER PORTAL
+        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-[#f1f5f9] font-mono">
+          MANAGER TERMINAL
         </h1>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs text-slate-400 mt-1 font-sans">
           {isSupabaseConfigured
             ? 'Supabase Authentication • TournX'
             : import.meta.env.DEV
-            ? 'Local Synthetic Mode • TournX (think.prompt.organise)'
+            ? 'Local Synthetic Mode • TournX'
             : 'Organizer Authentication • TournX'}
         </p>
       </div>
@@ -177,61 +176,61 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       {/* Mode Info Banner */}
       {!isSupabaseConfigured ? (
         import.meta.env.DEV ? (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
-            <p className="font-bold">Local Development Mode Active</p>
-            <p className="mt-0.5 text-blue-700">
-              Demo login: <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">admin@ftm.local</code> / <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">DemoAdmin@2026</code>
+          <div className="mb-4 p-3 bg-[#131b16] border border-[#23352a] rounded-xl text-xs text-slate-300">
+            <p className="font-bold text-lime-400 font-mono">Local Development Mode Active</p>
+            <p className="mt-0.5 text-slate-400">
+              Demo login: <code className="bg-[#1c2921] px-1 py-0.5 rounded font-mono text-lime-300">admin@ftm.local</code> / <code className="bg-[#1c2921] px-1 py-0.5 rounded font-mono text-lime-300">DemoAdmin@2026</code>
             </p>
           </div>
         ) : (
-          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+          <div className="mb-4 p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300">
             <p className="font-bold">Service Notice</p>
-            <p className="mt-0.5 text-amber-700">
+            <p className="mt-0.5 text-amber-400">
               Supabase authentication service is not configured. Organizer access requires a valid cloud backend.
             </p>
           </div>
         )
       ) : (
-        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+        <div className="mb-4 p-3 bg-[#131c16] border border-[#213527] rounded-xl text-xs text-slate-300">
           <div className="flex items-center justify-between">
-            <p className="font-bold">Cloud Dev Project Connected</p>
+            <p className="font-bold text-lime-400 font-mono">Cloud Dev Connected</p>
             {getSupabaseProjectHost() && (
-              <span className="font-mono text-[10px] text-emerald-900 bg-emerald-100/70 px-1.5 py-0.5 rounded">
+              <span className="font-mono text-[10px] text-lime-300 bg-lime-950/60 border border-lime-800/50 px-1.5 py-0.5 rounded">
                 {getSupabaseProjectHost()}
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-emerald-700">
-            Authenticated via Supabase. Sign in with your organizer account.
+          <p className="mt-0.5 text-slate-400">
+            Sign in with your organizer account to manage squads, fixtures & rules.
           </p>
         </div>
       )}
 
       {/* Info notification */}
       {infoMsg && (
-        <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+        <div className="mb-4 p-3 rounded-lg bg-lime-950/40 border border-lime-800/60 text-lime-300 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-lime-400" />
           <span>{infoMsg}</span>
         </div>
       )}
 
       {/* Error alert */}
       {errorMsg && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2">
+        <div className="mb-4 p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2">
           <div className="flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
             <span className="flex-1">{errorMsg}</span>
           </div>
           {isUnconfirmedError && (
-            <div className="pt-2 border-t border-red-200 flex items-center justify-between">
-              <span className="text-[11px] text-red-600">Need a new verification link?</span>
+            <div className="pt-2 border-t border-rose-800/40 flex items-center justify-between">
+              <span className="text-[11px] text-rose-400">Need a new verification link?</span>
               <button
                 type="button"
                 onClick={handleResendConfirmation}
                 disabled={isResending}
-                className="px-2.5 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
+                className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
               >
-                {isResending ? 'Sending...' : 'Resend Confirmation Email'}
+                {isResending ? 'Sending...' : 'Resend Email'}
               </button>
             </div>
           )}
@@ -240,7 +239,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       {/* Sign in / Sign up Tab Switcher */}
       {isSupabaseConfigured && (
-        <div className="flex border-b border-slate-200 mb-6">
+        <div className="flex border-b border-[#1f2e26] mb-6">
           <button
             type="button"
             onClick={() => {
@@ -248,10 +247,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               setErrorMsg('');
               setInfoMsg('');
             }}
-            className={`flex-1 pb-2.5 text-xs font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
+            className={`flex-1 pb-2.5 text-xs font-mono font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
               !isSignUp
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'border-lime-500 text-lime-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}
           >
             Sign In
@@ -263,10 +262,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               setErrorMsg('');
               setInfoMsg('');
             }}
-            className={`flex-1 pb-2.5 text-xs font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
+            className={`flex-1 pb-2.5 text-xs font-mono font-bold uppercase tracking-wider text-center cursor-pointer transition border-b-2 ${
               isSignUp
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'border-lime-500 text-lime-400'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}
           >
             Sign Up
@@ -277,35 +276,35 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-            Organizer Email
+          <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
+            Manager Email
           </label>
           <div className="relative">
-            <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+            <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
             <input
               type="email"
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder={isSupabaseConfigured ? 'organizer@tournx.app' : 'admin@ftm.local'}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full pl-9 pr-3 py-2.5 bg-[#0b100d] border border-[#23352a] rounded-lg text-xs text-[#f1f5f9] focus:border-lime-500 focus:outline-none font-sans placeholder:text-slate-600"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+          <label className="block text-xs font-mono uppercase tracking-wider text-slate-300 mb-1.5">
             Password
           </label>
           <div className="relative">
-            <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+            <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
             <input
               type="password"
               required
               value={password}
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••••••"
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full pl-9 pr-3 py-2.5 bg-[#0b100d] border border-[#23352a] rounded-lg text-xs text-[#f1f5f9] focus:border-lime-500 focus:outline-none font-sans placeholder:text-slate-600"
             />
           </div>
         </div>
@@ -313,7 +312,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer shadow-sm"
+          className="w-full py-2.5 px-4 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-extrabold text-xs uppercase tracking-wider rounded-lg transition cursor-pointer shadow-md"
         >
           {loading
             ? 'Authenticating...'
@@ -333,7 +332,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 setErrorMsg('');
                 setInfoMsg('');
               }}
-              className="text-xs text-blue-600 hover:underline font-semibold"
+              className="text-xs text-lime-400 hover:underline font-mono"
             >
               {isSignUp
                 ? 'Already have an account? Sign in'
@@ -343,11 +342,11 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
         )}
 
         {import.meta.env.DEV && !isSupabaseConfigured && (
-          <div className="pt-2 border-t border-slate-100">
+          <div className="pt-2 border-t border-[#1f2e26]">
             <button
               type="button"
               onClick={handleQuickDemoLogin}
-              className="w-full py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-slate-200 flex items-center justify-center gap-1.5"
+              className="w-full py-2 px-4 bg-[#141d18] hover:bg-[#1a261f] text-lime-400 font-mono text-xs uppercase tracking-wider rounded-lg transition cursor-pointer border border-[#273a2f] flex items-center justify-center gap-1.5"
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>Local Demo Admin Sign-In</span>

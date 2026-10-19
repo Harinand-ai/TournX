@@ -292,6 +292,12 @@ class LocalDataService {
       this.setItem(demoRulesKey, DEMO_RULES);
     }
 
+    const demoAccessCodesKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'access_codes');
+    const existingDemoCodes = this.getItem<AccessCode[]>(demoAccessCodesKey, []);
+    if (!existingDemoCodes || existingDemoCodes.length === 0) {
+      this.setItem(demoAccessCodesKey, this.seedDefaultDemoAccessCodes());
+    }
+
     storage.setItem(FTM_STORAGE_KEYS.DEV_MODE, 'true');
     storage.setItem(FTM_STORAGE_KEYS.SCHEMA_VERSION, '2.0.0');
   }
@@ -524,14 +530,20 @@ class LocalDataService {
     return all[idx];
   }
 
-  public deleteTournament(id: string): boolean {
+  public deleteTournament(id: string, actorUserId?: string): boolean {
     if (id === DEMO_TOURNAMENT_ID) {
-      console.warn('Cannot delete the default TournX demo tournament.');
-      return false;
+      throw new Error('The default TournX demo tournament cannot be deleted.');
     }
 
     const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
     const target = all.find(t => t.id === id);
+    if (!target) return false;
+
+    // Authorization check: if actorUserId is specified and does not match created_by, deny
+    if (actorUserId && target.created_by && target.created_by !== actorUserId && !this.isDevAdminLoggedIn()) {
+      throw new Error(`Unauthorized: You do not own "${target.name}". Only the creator can delete it.`);
+    }
+
     const filtered = all.filter(t => t.id !== id);
     this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, filtered);
 
@@ -589,6 +601,72 @@ class LocalDataService {
     return true;
   }
 
+  public seedDefaultDemoAccessCodes(): AccessCode[] {
+    const now = new Date().toISOString();
+    return [
+      {
+        id: 'demo-code-view-standard',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'VIEW',
+        code_hash: sha256Sync('tx_salt_TX-VIEW-9876'),
+        label: 'Demo Spectator Pass (TX-VIEW-9876)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+      {
+        id: 'demo-code-view-unhyphenated',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'VIEW',
+        code_hash: sha256Sync('tx_salt_TXVIEW9876'),
+        label: 'Demo Spectator Pass (TXVIEW9876)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+      {
+        id: 'demo-code-view-quick',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'VIEW',
+        code_hash: sha256Sync('tx_salt_DEMO2026'),
+        label: 'Demo Spectator Pass (DEMO2026)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+      {
+        id: 'demo-code-score-standard',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'SCORE',
+        code_hash: sha256Sync('tx_salt_TX-SCORE-9876'),
+        label: 'Demo Scorekeeper Pass (TX-SCORE-9876)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+      {
+        id: 'demo-code-score-unhyphenated',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'SCORE',
+        code_hash: sha256Sync('tx_salt_TXSCORE9876'),
+        label: 'Demo Scorekeeper Pass (TXSCORE9876)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+      {
+        id: 'demo-code-score-quick',
+        tournament_id: DEMO_TOURNAMENT_ID,
+        role: 'SCORE',
+        code_hash: sha256Sync('tx_salt_SCORE2026'),
+        label: 'Demo Scorekeeper Pass (SCORE2026)',
+        is_active: true,
+        use_count: 0,
+        created_at: now,
+      },
+    ];
+  }
+
   /**
    * Resets ONLY the demo tournament to pristine state.
    * STRICT GUARANTEE: Does NOT delete any user-created tournaments!
@@ -613,6 +691,7 @@ class LocalDataService {
     this.setItem(this.tourneyKey(DEMO_TOURNAMENT_ID, 'motm'), DEMO_MOTM);
     this.setItem(this.tourneyKey(DEMO_TOURNAMENT_ID, 'committee'), DEMO_COMMITTEE);
     this.setItem(this.tourneyKey(DEMO_TOURNAMENT_ID, 'rules'), DEMO_RULES);
+    this.setItem(this.tourneyKey(DEMO_TOURNAMENT_ID, 'access_codes'), this.seedDefaultDemoAccessCodes());
 
     this.setActiveTournamentId(DEMO_TOURNAMENT_ID);
   }
@@ -791,10 +870,13 @@ class LocalDataService {
     tournamentId: string,
     rawCode: string
   ): { success: boolean; role?: 'VIEW' | 'SCORE'; label?: string; error?: string } {
-    const normalized = rawCode.trim().toUpperCase();
-    if (!normalized) {
+    const trimmed = rawCode.trim();
+    if (!trimmed) {
       return { success: false, error: 'Access code cannot be empty.' };
     }
+
+    const normalized = trimmed.toUpperCase();
+    const unhyphenated = normalized.replace(/[^A-Z0-9]/g, '');
 
     // Rate-limiting check: max 5 failed attempts per 5-minute window
     const rateLimitKey = `ftm_ratelimit_${tournamentId}`;
@@ -817,8 +899,11 @@ class LocalDataService {
     }
 
     const expectedHash = sha256Sync(`tx_salt_${normalized}`);
+    const unhyphenatedHash = sha256Sync(`tx_salt_${unhyphenated}`);
     const codes = this.getAccessCodes(tournamentId);
-    const found = codes.find(c => c.code_hash === expectedHash);
+    const found = codes.find(
+      c => c.code_hash === expectedHash || (unhyphenated && c.code_hash === unhyphenatedHash)
+    );
 
     if (!found || !found.is_active) {
       rateData.attempts += 1;
@@ -828,6 +913,10 @@ class LocalDataService {
 
     if (found.expires_at && new Date(found.expires_at).getTime() < now) {
       return { success: false, error: 'This access code has expired.' };
+    }
+
+    if (found.max_uses && found.use_count >= found.max_uses) {
+      return { success: false, error: 'Access code has reached maximum permitted usage limit.' };
     }
 
     // Successful match: increment use_count & reset failed attempts
@@ -857,10 +946,13 @@ class LocalDataService {
   public getSessionRole(tournamentId: string): 'VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS' {
     const storage = this.getStorage();
     const explicitRole = storage.getItem(`ftm_role_${tournamentId}`);
-    if (explicitRole === 'VIEW' || explicitRole === 'SCORE' || explicitRole === 'ORGANIZER') {
+    
+    // Explicit stored role can only be VIEW or SCORE (from verified access code)
+    if (explicitRole === 'VIEW' || explicitRole === 'SCORE') {
       return explicitRole;
     }
 
+    // ORGANIZER role cannot be forged via localStorage; requires authenticated admin or owner
     if (this.isDevAdminLoggedIn()) {
       const tourney = this.getTournamentById(tournamentId);
       if (tournamentId === DEMO_TOURNAMENT_ID || tourney?.created_by === 'dev-admin') {
@@ -874,6 +966,11 @@ class LocalDataService {
   public setSessionRole(tournamentId: string, role: 'VIEW' | 'SCORE' | 'ORGANIZER' | null): void {
     const storage = this.getStorage();
     if (role) {
+      // Security: Disallow setting ORGANIZER without admin session
+      if (role === 'ORGANIZER' && !this.isDevAdminLoggedIn()) {
+        console.warn('[Security] Unauthorized attempt to assign ORGANIZER role in client session');
+        return;
+      }
       storage.setItem(`ftm_role_${tournamentId}`, role);
     } else {
       storage.removeItem(`ftm_role_${tournamentId}`);

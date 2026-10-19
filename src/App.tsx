@@ -660,14 +660,13 @@ export function App() {
   }, [currentTab]);
 
   const isVerifiedOrganizer = useMemo(() => {
-    if (sessionRole === 'ORGANIZER') return true;
     if (currentUserId && activeTournament?.created_by === currentUserId) return true;
     if (import.meta.env.DEV && isAdminLoggedIn) {
       if (activeTournament?.id === DEMO_TOURNAMENT_ID) return true;
       if (activeTournament?.created_by === 'dev-admin') return true;
     }
     return false;
-  }, [sessionRole, isAdminLoggedIn, currentUserId, activeTournament]);
+  }, [isAdminLoggedIn, currentUserId, activeTournament]);
 
   // Dedicated Edge-to-Edge Participant Shell
   if (isParticipantRoute) {

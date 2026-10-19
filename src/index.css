@@ -6,19 +6,21 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: #0a0d0b;
+    color: #f1f5f9;
   }
 
   body {
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
+    background-color: #0a0d0b !important;
+    color: #f1f5f9 !important;
     min-height: 100vh;
-    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    selection-background-color: rgba(132, 204, 22, 0.25);
+    selection-color: #bef264;
   }
 
   ::placeholder {
-    color: #94a3b8;
+    color: #64748b;
     opacity: 1;
   }
 
@@ -26,157 +28,221 @@
     font-family: inherit;
   }
 
-  /* Clear default focus outline and replace with restrained emerald focus ring */
   input:focus, textarea:focus, select:focus, button:focus-visible {
     outline: none;
   }
 }
 
-/* Clean Editorial Sports Dashboard Utilities */
-.card-editorial {
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+/* ==========================================================================
+   RETRO FOOTBALL MANAGEMENT DESIGN SYSTEM
+   Deep Charcoal + Off-White + Restrained Lime-Green + Scoreboard Typography
+   ========================================================================== */
+
+.font-pixel {
+  font-family: 'Silkscreen', monospace;
+  letter-spacing: 0.03em;
 }
 
-.input-editorial {
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #0f172a;
-  border-radius: 0.75rem;
+.font-pixel-score {
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Retro CRT / Scanline Texture */
+.retro-scanlines {
+  background-image: 
+    linear-gradient(rgba(18, 26, 21, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  background-size: 100% 3px, 6px 100%;
+}
+
+.retro-dot-grid {
+  background-image: radial-gradient(rgba(132, 204, 22, 0.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Retro Card System */
+.retro-card {
+  background-color: #0f1411;
+  border: 1px solid #1f2e26;
+  border-radius: 0.875rem;
+  box-shadow: 0 2px 0 #070a08, inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.retro-card-interactive {
+  transition: all 0.15s ease-out;
+}
+
+.retro-card-interactive:hover {
+  border-color: #365342;
+  background-color: #131b16;
+  box-shadow: 0 3px 0 #070a08, 0 0 16px rgba(132, 204, 22, 0.06);
+  transform: translateY(-1px);
+}
+
+.retro-card-live {
+  background-color: #121c16;
+  border: 1px solid #84cc16;
+  box-shadow: 0 3px 0 #09130d, 0 0 20px rgba(132, 204, 22, 0.18);
+  border-radius: 0.875rem;
+}
+
+/* Retro Buttons */
+.retro-btn-primary {
+  background-color: #84cc16;
+  border: 1px solid #a3e635;
+  color: #0a0d0b;
+  font-weight: 800;
+  border-radius: 0.625rem;
+  box-shadow: 0 2px 0 #4d7c0f, inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+
+.retro-btn-primary:hover {
+  background-color: #a3e635;
+  border-color: #bef264;
+}
+
+.retro-btn-primary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #4d7c0f;
+}
+
+.retro-btn-secondary {
+  background-color: #141c17;
+  border: 1px solid #24352b;
+  color: #a3e635;
+  font-weight: 700;
+  border-radius: 0.625rem;
+  box-shadow: 0 2px 0 #090e0b;
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+
+.retro-btn-secondary:hover {
+  background-color: #1a251f;
+  border-color: #3b5243;
+  color: #bef264;
+}
+
+.retro-btn-secondary:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #090e0b;
+}
+
+/* Retro Inputs */
+.retro-input {
+  background-color: #0b100d;
+  border: 1px solid #23342a;
+  color: #f1f5f9;
+  border-radius: 0.625rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.input-editorial:focus {
-  border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+.retro-input:focus {
+  border-color: #84cc16;
+  box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.2);
 }
 
-.btn-primary-emerald {
-  background-color: #059669;
-  color: #ffffff;
-  font-weight: 700;
-  border-radius: 0.75rem;
-  transition: all 0.15s ease;
+/* Retro Status Badges */
+.retro-badge-live {
+  background-color: rgba(132, 204, 22, 0.15);
+  border: 1px solid #84cc16;
+  color: #a3e635;
 }
 
-.btn-primary-emerald:hover {
-  background-color: #047857;
-  box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.2);
+.retro-badge-ft {
+  background-color: rgba(148, 163, 184, 0.1);
+  border: 1px solid #334155;
+  color: #94a3b8;
 }
 
-/* Minimalist Editorial Scrollbar */
+.retro-badge-upcoming {
+  background-color: rgba(56, 189, 248, 0.1);
+  border: 1px solid #0284c7;
+  color: #38bdf8;
+}
+
+/* Retro Tabs & Pills */
+.retro-pill-active {
+  background-color: #1a261f;
+  border: 1px solid #84cc16;
+  color: #bef264;
+  box-shadow: 0 1px 0 #080d0a;
+}
+
+.retro-pill-inactive {
+  background-color: #101612;
+  border: 1px solid #1f2d24;
+  color: #94a3b8;
+}
+
+.retro-pill-inactive:hover {
+  background-color: #151e18;
+  color: #f1f5f9;
+  border-color: #2b3d32;
+}
+
+/* Minimalist Retro Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #0a0d0b;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #24352b;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #3b5243;
 }
 
 .safe-bottom {
   padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
 }
 
-/* ==========================================================================
-   SCOPED PARTICIPANT UI: MINECRAFT-INSPIRED FOOTBALL STADIUM THEME
-   Strictly scoped to .theme-minecraft-stadium container
-   Guarantees zero leakage into clean editorial Organizer Workspace
-   ========================================================================== */
-
+/* Backwards-compatibility aliases for existing sub-components */
 .theme-minecraft-stadium {
-  background-color: #0b110e;
-  background-image: 
-    radial-gradient(rgba(16, 185, 129, 0.05) 1.5px, transparent 1.5px),
-    linear-gradient(to bottom, #0d1512, #090e0c);
-  background-size: 24px 24px, 100% 100%;
+  background-color: #0a0d0b;
   color: #f1f5f9;
   min-height: 100vh;
 }
-
-.theme-minecraft-stadium .font-pixel {
-  font-family: 'Silkscreen', 'Press Start 2P', monospace;
-  letter-spacing: 0.02em;
-}
-
-.theme-minecraft-stadium .font-pixel-score {
-  font-family: 'Press Start 2P', monospace;
-  letter-spacing: 0.06em;
-}
-
 .theme-minecraft-stadium .stadium-card {
-  background-color: #121a16;
+  background-color: #0f1411;
   border: 1px solid #1f2e26;
-  box-shadow: 0 2px 0 #080d0a, inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 0 #070a08, inset 0 1px 0 rgba(255, 255, 255, 0.03);
   border-radius: 0.875rem;
-  position: relative;
 }
-
-.theme-minecraft-stadium .stadium-card-hover {
-  transition: all 0.15s ease-out;
-}
-
 .theme-minecraft-stadium .stadium-card-hover:hover {
-  border-color: #2e473a;
-  background-color: #15201b;
-  box-shadow: 0 3px 0 #080d0a, 0 0 12px rgba(16, 185, 129, 0.08);
-  transform: translateY(-1px);
+  border-color: #365342;
+  background-color: #131b16;
 }
-
 .theme-minecraft-stadium .stadium-card-live {
-  background-color: #14201a;
-  border: 1px solid #10b981;
-  box-shadow: 0 3px 0 #062b1e, 0 0 16px rgba(16, 185, 129, 0.18);
+  background-color: #121c16;
+  border: 1px solid #84cc16;
+  box-shadow: 0 3px 0 #09130d, 0 0 20px rgba(132, 204, 22, 0.18);
   border-radius: 0.875rem;
 }
-
 .theme-minecraft-stadium .stadium-block-btn {
-  background-color: #059669;
-  border: 1px solid #10b981;
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 2px 0 #044d37, inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background-color: #84cc16;
+  border: 1px solid #a3e635;
+  color: #0a0d0b;
+  font-weight: 800;
   border-radius: 0.625rem;
-  transition: all 0.1s ease;
 }
-
-.theme-minecraft-stadium .stadium-block-btn:hover {
-  background-color: #047857;
-  border-color: #34d399;
-}
-
-.theme-minecraft-stadium .stadium-block-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 #044d37;
-}
-
 .theme-minecraft-stadium .stadium-pill-active {
-  background-color: #162a20;
-  border: 1px solid #10b981;
-  color: #a7f3d0;
-  box-shadow: 0 1px 0 #09130e;
+  background-color: #1a261f;
+  border: 1px solid #84cc16;
+  color: #bef264;
 }
-
 .theme-minecraft-stadium .stadium-pill-inactive {
-  background-color: #111814;
-  border: 1px solid #1e2b23;
+  background-color: #101612;
+  border: 1px solid #1f2d24;
   color: #94a3b8;
 }
-
-.theme-minecraft-stadium .stadium-pill-inactive:hover {
-  background-color: #16201b;
-  color: #e2e8f0;
-  border-color: #2b3d32;
-}
-
