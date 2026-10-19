@@ -113,6 +113,30 @@
   }
 }
 
+/* Mobile Phone Responsive Optimization */
+@media (max-width: 640px) {
+  .retro-perspective-grid-container {
+    height: 42vh;
+    perspective: 260px;
+    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.4) 15%, rgba(0, 0, 0, 0.95) 55%, rgba(0, 0, 0, 1) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.4) 15%, rgba(0, 0, 0, 0.95) 55%, rgba(0, 0, 0, 1) 100%);
+  }
+
+  .retro-perspective-grid {
+    background-size: 36px 36px;
+    animation: retroGridScrollMobile 1.6s linear infinite;
+  }
+}
+
+@keyframes retroGridScrollMobile {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 36px;
+  }
+}
+
 /* Retro Card System */
 .retro-card {
   background-color: #0f1411;
