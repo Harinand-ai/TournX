@@ -62,6 +62,16 @@ const BENCHMARK_SQUAD_PROMPT =
   "For Kerala Blasters, add goalkeeper Daniel, defender Arjun, midfielder Rahul and forward Cristiano. Make Arjun the captain. The team manager is Michael.\n\n" +
   "For Bengaluru FC, add goalkeeper Leo, defender Marcus, midfielder David and forward Samuel. Make Marcus the captain. The team manager is Sarah.";
 
+const CASUAL_EXAMPLE_PROMPTS = [
+  { label: 'Teams A, B, C, D', text: 'Teams are A, B, C and D. Make a tournament.' },
+  { label: 'Premier League Clubs', text: 'make a tournament with Arsenal, Chelsea, Liverpool and Spurs' },
+  { label: 'Tomorrow at 5 PM', text: 'Crystal Palace Fulham Dortmund Spurs at college ground tomorrow 5 pm' },
+  { label: 'Colored Teams', text: 'I have 4 teams: Red, Blue, Green and Yellow. Arrange a football tournament' },
+  { label: 'Round-Robin (All vs All)', text: 'we have 6 teams and want everyone to play each other once' },
+  { label: 'League + Semifinals', text: 'make a tournament for 8 teams, top 4 go to semifinals' },
+  { label: 'Match Pairs (A vs B)', text: 'A vs B, C vs D, make tournament' },
+];
+
 export function CreateTournamentWizard({
   initialData,
   onComplete,
@@ -83,6 +93,7 @@ export function CreateTournamentWizard({
   const [tournamentDraft, setTournamentDraft] = useState<ParsedTournamentDraft | null>(null);
   const [manualEditDraft, setManualEditDraft] = useState(false);
   const [newTeamNameInput, setNewTeamNameInput] = useState('');
+  const [step1NewTeam, setStep1NewTeam] = useState('');
 
   // Step 2: Generated Fixtures preview
   const [generatedMatches, setGeneratedMatches] = useState<EngineMatch[]>([]);
@@ -118,6 +129,16 @@ export function CreateTournamentWizard({
   const [copiedViewerCode, setCopiedViewerCode] = useState(false);
   const [copiedModifierCode, setCopiedModifierCode] = useState(false);
   const [hasSavedDraftPrompt, setHasSavedDraftPrompt] = useState<boolean>(false);
+
+  // Live parsed interpretation summary for progressive input
+  const liveParsedDraft = useMemo(() => {
+    if (!tournamentPromptText.trim() || tournamentPromptText.trim().length < 3) return null;
+    try {
+      return parseTournamentPrompt(tournamentPromptText);
+    } catch {
+      return null;
+    }
+  }, [tournamentPromptText]);
 
   // Auto-parse initial prompt or check saved draft
   useEffect(() => {
@@ -173,23 +194,50 @@ export function CreateTournamentWizard({
     }
   }, [tournamentDraft]);
 
-  // Handle Parse Tournament Prompt
-  const handleParseTournament = () => {
-    if (!tournamentPromptText.trim()) return;
+  // Handle Parse Tournament Prompt or proceed with draft
+  const handleParseTournament = (customDraft?: ParsedTournamentDraft) => {
+    const draft = customDraft || tournamentDraft || liveParsedDraft || parseTournamentPrompt(tournamentPromptText);
+    if (!draft) return;
     setIsParsingTournament(true);
     setTimeout(() => {
-      const parsed = parseTournamentPrompt(tournamentPromptText);
-      setTournamentDraft(parsed);
-      setVisibility(parsed.visibility);
-      if (parsed.embeddedSquads && Object.keys(parsed.embeddedSquads.squads).length > 0) {
-        setSquadRosters(parsed.embeddedSquads.squads);
+      setTournamentDraft(draft);
+      setVisibility(draft.visibility);
+      if (draft.embeddedSquads && Object.keys(draft.embeddedSquads.squads).length > 0) {
+        setSquadRosters(draft.embeddedSquads.squads);
       }
       try {
         localStorage.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, tournamentPromptText);
       } catch {}
       setIsParsingTournament(false);
       setCurrentStep(2); // Move to Tournament Preview
-    }, 200);
+    }, 150);
+  };
+
+  const handleStep1RemoveTeam = (teamName: string) => {
+    const current = tournamentDraft || liveParsedDraft;
+    if (!current) return;
+    const nextTeams = current.teams.filter(t => t !== teamName);
+    setTournamentDraft({
+      ...current,
+      teams: nextTeams,
+      teamCount: nextTeams.length,
+    });
+  };
+
+  const handleStep1AddTeam = () => {
+    if (!step1NewTeam.trim()) return;
+    const current = tournamentDraft || liveParsedDraft;
+    if (!current) return;
+    const trimmed = step1NewTeam.trim();
+    if (current.teams.includes(trimmed)) return;
+    const nextTeams = [...current.teams, trimmed];
+    setTournamentDraft({
+      ...current,
+      teams: nextTeams,
+      teamCount: nextTeams.length,
+      ambiguities: current.ambiguities.filter(a => !a.includes('identified')),
+    });
+    setStep1NewTeam('');
   };
 
   // Add team manually in preview
@@ -482,10 +530,10 @@ export function CreateTournamentWizard({
           },
         });
       } catch (cloudErr: any) {
-        // If Supabase is configured and returned an error (e.g. single-tournament limit or unauthenticated),
-        // we must surface the real error rather than silently synthesizing a local duplicate!
-        if (isSupabaseConfigured) {
-          setPublishError(cloudErr.message || 'Failed to save tournament. Please try again.');
+        // In production builds or when Supabase is configured, surface the real error immediately.
+        // Never silently synthesize local mock data in production!
+        if (isSupabaseConfigured || !import.meta.env.DEV) {
+          setPublishError(cloudErr.message || 'Failed to save tournament. Real organizer authentication and active database persistence are required.');
           setIsPublishing(false);
           isPublishingRef.current = false;
           return;
@@ -577,7 +625,7 @@ export function CreateTournamentWizard({
           away_team_id: gm.away_team_id ? teamIndexToId[gm.away_team_id] || '' : '',
           scheduled_date: tournamentDraft.startDateIso || null,
           scheduled_time: tournamentDraft.startTime || null,
-          venue: tournamentDraft.venue || 'Kannur Municipal Stadium',
+          venue: tournamentDraft.venue || null,
           home_score: null,
           away_score: null,
           status: 'UPCOMING',
@@ -738,19 +786,159 @@ export function CreateTournamentWizard({
               </div>
             )}
 
+            {/* Quick Example Chips */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Try an informal prompt:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {CASUAL_EXAMPLE_PROMPTS.map((ex, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setTournamentPromptText(ex.text);
+                      const parsed = parseTournamentPrompt(ex.text);
+                      setTournamentDraft(parsed);
+                      setVisibility(parsed.visibility);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 border border-slate-200 text-slate-700 font-medium transition cursor-pointer"
+                  >
+                    {ex.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label htmlFor="tournament-prompt" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 Tournament Prompt
               </label>
               <textarea
                 id="tournament-prompt"
-                rows={6}
+                rows={4}
                 value={tournamentPromptText}
                 onChange={(e) => setTournamentPromptText(e.target.value)}
-                placeholder="e.g. I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15 at Kannur Municipal Stadium. Six teams are participating: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. It should follow a single round-robin format, with three points for a win, one for a draw and none for a loss. Each team can have five starting players and two substitutes. Please enable goalscorer tracking and player of the match, and make the tournament public."
+                placeholder="e.g. Teams are A, B, C and D. Make a tournament. Or: Crystal Palace Fulham Dortmund Spurs at college ground tomorrow 5 pm"
                 className="w-full p-4 rounded-xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20 placeholder:text-slate-400 transition resize-none font-sans leading-relaxed"
               />
             </div>
+
+            {/* Live Interpretation Summary Card */}
+            {(tournamentDraft || liveParsedDraft) && (
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      TournX Interpretation Summary
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Deterministic Local Parser
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-medium">Tournament Name:</span>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {(tournamentDraft || liveParsedDraft)?.name || 'TournX Championship'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Format:</span>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {((tournamentDraft || liveParsedDraft)?.format === 'SINGLE_ROUND_ROBIN' && 'Single Round-Robin (All-play-all once)') ||
+                       ((tournamentDraft || liveParsedDraft)?.format === 'DOUBLE_ROUND_ROBIN' && 'Double Round-Robin (Home & Away)') ||
+                       ((tournamentDraft || liveParsedDraft)?.format === 'SINGLE_ELIMINATION' && 'Knockout (Single Elimination)') ||
+                       ((tournamentDraft || liveParsedDraft)?.format === 'DOUBLE_ELIMINATION' && 'Double Elimination Knockout') ||
+                       ((tournamentDraft || liveParsedDraft)?.format === 'LEAGUE_WITH_PLAYOFFS' && `League + Playoffs (Top ${(tournamentDraft || liveParsedDraft)?.playoffQualifiers || 4} qualify)`) ||
+                       (tournamentDraft || liveParsedDraft)?.format}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Schedule:</span>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {(tournamentDraft || liveParsedDraft)?.startDateIso || (tournamentDraft || liveParsedDraft)?.startTime
+                        ? `${(tournamentDraft || liveParsedDraft)?.startDateIso || ''} ${(tournamentDraft || liveParsedDraft)?.startTime || ''}`.trim()
+                        : 'Not specified (editable)'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-medium">Venue:</span>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {(tournamentDraft || liveParsedDraft)?.venue || 'Not specified (editable)'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Extracted Teams with Quick Badges and Inline Add */}
+                <div className="pt-2 border-t border-slate-200/80">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-slate-700">
+                      Detected Teams ({(tournamentDraft || liveParsedDraft)?.teams.length || 0}):
+                    </span>
+                    <span className="text-[11px] text-slate-500">Click &times; to remove</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {(tournamentDraft || liveParsedDraft)?.teams.map((tName, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200 font-semibold text-xs"
+                      >
+                        <span>{tName}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleStep1RemoveTeam(tName)}
+                          className="w-4 h-4 rounded-full hover:bg-emerald-200 flex items-center justify-center text-emerald-700 hover:text-emerald-900 cursor-pointer"
+                          title={`Remove ${tName}`}
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+
+                    <div className="inline-flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={step1NewTeam}
+                        onChange={(e) => setStep1NewTeam(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleStep1AddTeam();
+                          }
+                        }}
+                        placeholder="Add team name..."
+                        className="px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 w-32"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleStep1AddTeam}
+                        className="px-2 py-1 text-xs rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clarification Alert if Ambiguities or Missing Teams */}
+                {(((tournamentDraft || liveParsedDraft)?.ambiguities.length || 0) > 0 || ((tournamentDraft || liveParsedDraft)?.teams.length || 0) < 2) && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Clarification Needed:</p>
+                      <p className="mt-0.5">
+                        {((tournamentDraft || liveParsedDraft)?.teams.length || 0) < 2
+                          ? 'Please provide at least 2 teams to schedule tournament matches.'
+                          : (tournamentDraft || liveParsedDraft)?.ambiguities[0]}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-100">
               <button
@@ -763,15 +951,15 @@ export function CreateTournamentWizard({
 
               <button
                 type="button"
-                disabled={!tournamentPromptText.trim() || isParsingTournament}
-                onClick={handleParseTournament}
+                disabled={!tournamentPromptText.trim() || isParsingTournament || (((tournamentDraft || liveParsedDraft)?.teams.length || 0) < 2)}
+                onClick={() => handleParseTournament()}
                 className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isParsingTournament ? (
                   <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
                   <>
-                    <span>Extract & Preview</span>
+                    <span>Review Fixtures & Details</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

@@ -93,7 +93,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
           onLoginSuccess();
         }
       } else {
-        // Local Synthetic Mode Demo Authentication
+        // Local Synthetic Mode Demo Authentication (Development Only)
+        if (!import.meta.env.DEV) {
+          setErrorMsg('Supabase backend service is not configured. Organizer authentication requires an active Supabase backend.');
+          return;
+        }
+
         if (
           (cleanEmail === 'admin@ftm.local' && password === 'DemoAdmin@2026') ||
           cleanEmail === 'admin' ||
@@ -162,19 +167,30 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
         </h1>
         <p className="text-xs text-slate-500 mt-1">
           {isSupabaseConfigured
-            ? 'Supabase Development Authentication • TournX'
-            : 'Local Synthetic Mode • TournX (think.prompt.organise)'}
+            ? 'Supabase Authentication • TournX'
+            : import.meta.env.DEV
+            ? 'Local Synthetic Mode • TournX (think.prompt.organise)'
+            : 'Organizer Authentication • TournX'}
         </p>
       </div>
 
       {/* Mode Info Banner */}
       {!isSupabaseConfigured ? (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
-          <p className="font-bold">Local Development Mode Active</p>
-          <p className="mt-0.5 text-blue-700">
-            Demo login: <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">admin@ftm.local</code> / <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">DemoAdmin@2026</code>
-          </p>
-        </div>
+        import.meta.env.DEV ? (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+            <p className="font-bold">Local Development Mode Active</p>
+            <p className="mt-0.5 text-blue-700">
+              Demo login: <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">admin@ftm.local</code> / <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">DemoAdmin@2026</code>
+            </p>
+          </div>
+        ) : (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            <p className="font-bold">Service Notice</p>
+            <p className="mt-0.5 text-amber-700">
+              Supabase authentication service is not configured. Organizer access requires a valid cloud backend.
+            </p>
+          </div>
+        )
       ) : (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
           <div className="flex items-center justify-between">
@@ -326,7 +342,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
           </div>
         )}
 
-        {!isSupabaseConfigured && (
+        {import.meta.env.DEV && !isSupabaseConfigured && (
           <div className="pt-2 border-t border-slate-100">
             <button
               type="button"

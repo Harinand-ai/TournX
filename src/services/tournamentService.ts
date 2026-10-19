@@ -59,9 +59,15 @@ class TournamentService {
 
         if (data && data.length > 0) {
           const cloudList = (data as Tournament[]).filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
-          const demo = localDataService.getTournamentById(DEMO_TOURNAMENT_ID);
-          if (demo && !cloudList.some(t => t.id === DEMO_TOURNAMENT_ID)) {
-            return [demo, ...cloudList];
+          const isDev = Boolean(
+            (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === 'test')) ||
+            (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test')
+          );
+          if (isDev) {
+            const demo = localDataService.getTournamentById(DEMO_TOURNAMENT_ID);
+            if (demo && !cloudList.some(t => t.id === DEMO_TOURNAMENT_ID)) {
+              return [demo, ...cloudList];
+            }
           }
           return cloudList;
         }
@@ -248,7 +254,15 @@ class TournamentService {
       return returnedTourney;
     }
 
-    // Local Synthetic Mode Fallback
+    // Local Synthetic Mode Fallback (strictly development and test runner only)
+    const isDev = Boolean(
+      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === 'test')) ||
+      (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test')
+    );
+    if (!isDev) {
+      throw new Error('Supabase authentication is required to create tournaments in production. Please sign in as an organizer.');
+    }
+
     const createdLocal = localDataService.createTournament({
       name: data.name || 'Untitled Tournament',
       slug: data.slug || undefined,

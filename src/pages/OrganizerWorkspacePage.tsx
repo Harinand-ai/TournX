@@ -267,7 +267,7 @@ export function OrganizerWorkspacePage({
         teams,
         matches,
         matchDuration: tournament.rules_config?.match_duration_minutes,
-        venue: 'Kannur Municipal Stadium',
+        venue: matches.find(m => m.venue)?.venue || undefined,
       });
 
       if (proposal.actionType === 'UNKNOWN') {

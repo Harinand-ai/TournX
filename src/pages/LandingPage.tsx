@@ -140,13 +140,17 @@ export function LandingPage({
         throw new Error('Registration failed. Please try again.');
       }
 
-      // Offline / Local synthetic mode fallback
-      localDataService.setDevAdminLoggedIn(true);
-      onOrganizeClick({
-        name: tournamentName.trim(),
-        description: tournamentDescription.trim(),
-        visibility: tournamentVisibility,
-      });
+      // Offline / Local synthetic mode fallback (development only)
+      if (import.meta.env.DEV) {
+        localDataService.setDevAdminLoggedIn(true);
+        onOrganizeClick({
+          name: tournamentName.trim(),
+          description: tournamentDescription.trim(),
+          visibility: tournamentVisibility,
+        });
+      } else {
+        throw new Error('Supabase backend service is required for organizer registration in production.');
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Registration failed. Please check your details.');
     } finally {
@@ -217,9 +221,13 @@ export function LandingPage({
         throw new Error('Sign in failed. No user session returned.');
       }
 
-      // Offline fallback login check
-      localDataService.setDevAdminLoggedIn(true);
-      onOrganizeClick();
+      // Offline fallback login check (development only)
+      if (import.meta.env.DEV) {
+        localDataService.setDevAdminLoggedIn(true);
+        onOrganizeClick();
+      } else {
+        throw new Error('Supabase backend service is required for organizer sign-in in production.');
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid email or password.');
     } finally {
@@ -614,8 +622,8 @@ export function LandingPage({
                   </form>
                 )}
 
-                {/* Instant Demo Sandbox Shortcut (local development only) */}
-                {!isSupabaseConfigured && (
+                {/* Instant Demo Sandbox Shortcut (strictly local development only) */}
+                {import.meta.env.DEV && !isSupabaseConfigured && (
                   <div className="mt-6 pt-4 border-t border-slate-200 text-center">
                     <button
                       type="button"

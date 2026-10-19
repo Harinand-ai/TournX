@@ -987,13 +987,35 @@ class LocalDataService {
     return { success: false, error: 'Invalid or expired invitation code.' };
   }
 
-  // Local Admin Session
+  // Local Admin Session (Strictly gated to local development & test runner)
   public isDevAdminLoggedIn(): boolean {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV === false) {
+      return false;
+    }
+    const isDevOrTest = Boolean(
+      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === 'test')) ||
+      (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test')
+    );
+    if (!isDevOrTest) {
+      return false;
+    }
     const storage = this.getStorage();
     return storage.getItem(FTM_STORAGE_KEYS.ADMIN_AUTH) === 'true';
   }
 
   public setDevAdminLoggedIn(loggedIn: boolean): void {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV === false) {
+      console.warn('[TournX Security] Synthetic local admin authentication is disabled in production builds.');
+      return;
+    }
+    const isDevOrTest = Boolean(
+      (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === 'test')) ||
+      (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test')
+    );
+    if (!isDevOrTest) {
+      console.warn('[TournX Security] Synthetic local admin authentication is disabled in production builds.');
+      return;
+    }
     const storage = this.getStorage();
     if (loggedIn) {
       storage.setItem(FTM_STORAGE_KEYS.ADMIN_AUTH, 'true');

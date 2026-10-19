@@ -167,7 +167,7 @@ export function App() {
   // Admin auth & session state
   const [isAuthLoading] = useState<boolean>(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
-    if (isSupabaseConfigured) return false;
+    if (isSupabaseConfigured || !import.meta.env.DEV) return false;
     return localDataService.isDevAdminLoggedIn();
   });
 
@@ -263,7 +263,7 @@ export function App() {
           setIsAdminLoggedIn(true);
           setCurrentUserId(session.user.id);
         } else {
-          setIsAdminLoggedIn(isSupabaseConfigured ? false : localDataService.isDevAdminLoggedIn());
+          setIsAdminLoggedIn((isSupabaseConfigured || !import.meta.env.DEV) ? false : localDataService.isDevAdminLoggedIn());
           setCurrentUserId(null);
         }
       });
@@ -422,7 +422,9 @@ export function App() {
   }, [currentTab, isAdminLoggedIn, handleNavigate]);
 
   const handleAdminLogin = () => {
-    localDataService.setDevAdminLoggedIn(true);
+    if (import.meta.env.DEV) {
+      localDataService.setDevAdminLoggedIn(true);
+    }
     setIsAdminLoggedIn(true);
     handleNavigate('admin');
   };
@@ -660,7 +662,7 @@ export function App() {
   const isVerifiedOrganizer = useMemo(() => {
     if (sessionRole === 'ORGANIZER') return true;
     if (currentUserId && activeTournament?.created_by === currentUserId) return true;
-    if (isAdminLoggedIn) {
+    if (import.meta.env.DEV && isAdminLoggedIn) {
       if (activeTournament?.id === DEMO_TOURNAMENT_ID) return true;
       if (activeTournament?.created_by === 'dev-admin') return true;
     }

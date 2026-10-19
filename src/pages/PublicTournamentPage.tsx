@@ -450,7 +450,7 @@ export function PublicTournamentPage({
                 <div className="flex items-center justify-between pt-2 border-t border-[#1f2e26] text-xs text-slate-400">
                   <span className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="truncate">{nextUpcomingMatch.venue || 'Kannur Municipal Stadium'}</span>
+                    <span className="truncate">{nextUpcomingMatch.venue || 'Venue TBD'}</span>
                   </span>
                   {isModifier && (
                     <button

@@ -29,7 +29,11 @@ export const TournamentSwitcherModal: React.FC<TournamentSwitcherModalProps> = (
       const valid = list.filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
       setTournaments(valid);
     } catch {
-      setTournaments(localDataService.getAllTournaments());
+      if (import.meta.env.DEV) {
+        setTournaments(localDataService.getAllTournaments());
+      } else {
+        setTournaments([]);
+      }
     }
   };
 
