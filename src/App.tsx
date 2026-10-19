@@ -406,7 +406,14 @@ export function App() {
   };
 
   const handleReplayIntro = () => {
-    setShowIntro(true);
+    try {
+      localStorage.removeItem('ftm_intro_seen');
+      sessionStorage.removeItem('ftm_dev_intro_played_session');
+    } catch {}
+    setShowIntro(false);
+    setTimeout(() => {
+      setShowIntro(true);
+    }, 20);
   };
 
   // Redirect to admin dashboard if logged in user is on admin-login
