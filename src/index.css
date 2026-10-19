@@ -6,17 +6,17 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
-    background-color: #0a0d0b;
-    color: #f1f5f9;
+    background-color: #090d16;
+    color: #f8fafc;
   }
 
   body {
-    background-color: #0a0d0b !important;
-    color: #f1f5f9 !important;
+    background-color: #090d16 !important;
+    color: #f8fafc !important;
     min-height: 100vh;
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    selection-background-color: rgba(132, 204, 22, 0.25);
-    selection-color: #bef264;
+    selection-background-color: rgba(16, 185, 129, 0.25);
+    selection-color: #34d399;
   }
 
   ::placeholder {
@@ -34,8 +34,8 @@
 }
 
 /* ==========================================================================
-   RETRO FOOTBALL MANAGEMENT DESIGN SYSTEM
-   Deep Charcoal + Off-White + Restrained Lime-Green + Scoreboard Typography
+   TOURNX PROFESSIONAL SPORTS MANAGEMENT DESIGN SYSTEM
+   Dark Navy/Charcoal + Emerald Accent + Clean Surfaces
    ========================================================================== */
 
 .font-pixel {
@@ -48,33 +48,33 @@
   letter-spacing: 0.05em;
 }
 
-/* Retro CRT / Scanline Texture */
+/* Scanline / Texture (Subtle background accent) */
 .retro-scanlines {
   background-image: 
-    linear-gradient(rgba(18, 26, 21, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-    linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+    linear-gradient(rgba(18, 26, 38, 0) 50%, rgba(0, 0, 0, 0.18) 50%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.01), transparent 50%);
   background-size: 100% 3px, 6px 100%;
 }
 
 .retro-dot-grid {
-  background-image: radial-gradient(rgba(132, 204, 22, 0.07) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-image: radial-gradient(rgba(16, 185, 129, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-/* Animated 3D Retro Arcade Perspective Grid */
+/* Subtle Perspective Grid in Landing Background */
 .retro-perspective-grid-container {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 56vh;
+  height: 52vh;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
   perspective: 340px;
   perspective-origin: 50% 0%;
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 20%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 1) 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 20%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 1) 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.8) 70%, rgba(0, 0, 0, 1) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.8) 70%, rgba(0, 0, 0, 1) 100%);
 }
 
 .retro-perspective-grid {
@@ -84,14 +84,12 @@
   width: 200%;
   height: 200%;
   background-image: 
-    linear-gradient(to right, rgba(132, 204, 22, 0.4) 1.5px, transparent 1.5px),
-    linear-gradient(to bottom, rgba(132, 204, 22, 0.4) 1.5px, transparent 1.5px);
+    linear-gradient(to right, rgba(16, 185, 129, 0.18) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.18) 1.5px, transparent 1.5px);
   background-size: 56px 56px;
   transform: rotateX(72deg);
   transform-origin: 50% 0%;
-  animation: retroGridScroll 2s linear infinite;
-  box-shadow: inset 0 0 60px rgba(132, 204, 22, 0.2);
-  filter: drop-shadow(0 0 3px rgba(132, 204, 22, 0.35));
+  animation: retroGridScroll 2.4s linear infinite;
 }
 
 .retro-horizon-glow {
@@ -99,9 +97,8 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.85) 50%, transparent 100%);
-  box-shadow: 0 0 30px 5px rgba(132, 204, 22, 0.6);
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.5) 50%, transparent 100%);
 }
 
 @keyframes retroGridScroll {
@@ -116,15 +113,13 @@
 /* Mobile Phone Responsive Optimization */
 @media (max-width: 640px) {
   .retro-perspective-grid-container {
-    height: 42vh;
+    height: 38vh;
     perspective: 260px;
-    mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.4) 15%, rgba(0, 0, 0, 0.95) 55%, rgba(0, 0, 0, 1) 100%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.4) 15%, rgba(0, 0, 0, 0.95) 55%, rgba(0, 0, 0, 1) 100%);
   }
 
   .retro-perspective-grid {
     background-size: 36px 36px;
-    animation: retroGridScrollMobile 1.6s linear infinite;
+    animation: retroGridScrollMobile 1.8s linear infinite;
   }
 }
 
@@ -137,12 +132,12 @@
   }
 }
 
-/* Retro Card System */
+/* Professional Card System */
 .retro-card {
-  background-color: #0f1411;
-  border: 1px solid #1f2e26;
+  background-color: #111827;
+  border: 1px solid #1f293d;
   border-radius: 0.875rem;
-  box-shadow: 0 2px 0 #070a08, inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
 }
 
 .retro-card-interactive {
@@ -150,114 +145,111 @@
 }
 
 .retro-card-interactive:hover {
-  border-color: #365342;
-  background-color: #131b16;
-  box-shadow: 0 3px 0 #070a08, 0 0 16px rgba(132, 204, 22, 0.06);
+  border-color: #2b3a54;
+  background-color: #141e30;
+  box-shadow: 0 4px 14px -3px rgba(0, 0, 0, 0.4);
   transform: translateY(-1px);
 }
 
 .retro-card-live {
-  background-color: #121c16;
-  border: 1px solid #84cc16;
-  box-shadow: 0 3px 0 #09130d, 0 0 20px rgba(132, 204, 22, 0.18);
+  background-color: #0f1c24;
+  border: 1px solid #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.12);
   border-radius: 0.875rem;
 }
 
-/* Retro Buttons */
+/* Clean Professional Buttons */
 .retro-btn-primary {
-  background-color: #84cc16;
-  border: 1px solid #a3e635;
-  color: #0a0d0b;
-  font-weight: 800;
+  background-color: #059669;
+  border: 1px solid #10b981;
+  color: #ffffff;
+  font-weight: 600;
   border-radius: 0.625rem;
-  box-shadow: 0 2px 0 #4d7c0f, inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  transition: all 0.1s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
   cursor: pointer;
 }
 
 .retro-btn-primary:hover {
-  background-color: #a3e635;
-  border-color: #bef264;
+  background-color: #10b981;
+  border-color: #34d399;
 }
 
 .retro-btn-primary:active {
   transform: translateY(1px);
-  box-shadow: 0 1px 0 #4d7c0f;
 }
 
 .retro-btn-secondary {
-  background-color: #141c17;
-  border: 1px solid #24352b;
-  color: #a3e635;
-  font-weight: 700;
+  background-color: #162032;
+  border: 1px solid #2b3a54;
+  color: #cbd5e1;
+  font-weight: 600;
   border-radius: 0.625rem;
-  box-shadow: 0 2px 0 #090e0b;
-  transition: all 0.1s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
   cursor: pointer;
 }
 
 .retro-btn-secondary:hover {
-  background-color: #1a251f;
-  border-color: #3b5243;
-  color: #bef264;
+  background-color: #1e2c44;
+  border-color: #3b4d6e;
+  color: #ffffff;
 }
 
 .retro-btn-secondary:active {
   transform: translateY(1px);
-  box-shadow: 0 1px 0 #090e0b;
 }
 
-/* Retro Inputs */
+/* Professional Inputs */
 .retro-input {
-  background-color: #0b100d;
-  border: 1px solid #23342a;
-  color: #f1f5f9;
+  background-color: #0b1120;
+  border: 1px solid #222f46;
+  color: #f8fafc;
   border-radius: 0.625rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .retro-input:focus {
-  border-color: #84cc16;
-  box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.2);
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
-/* Retro Status Badges */
+/* Status Badges */
 .retro-badge-live {
-  background-color: rgba(132, 204, 22, 0.15);
-  border: 1px solid #84cc16;
-  color: #a3e635;
+  background-color: rgba(16, 185, 129, 0.15);
+  border: 1px solid #10b981;
+  color: #34d399;
 }
 
 .retro-badge-ft {
-  background-color: rgba(148, 163, 184, 0.1);
+  background-color: rgba(148, 163, 184, 0.12);
   border: 1px solid #334155;
   color: #94a3b8;
 }
 
 .retro-badge-upcoming {
-  background-color: rgba(56, 189, 248, 0.1);
+  background-color: rgba(56, 189, 248, 0.12);
   border: 1px solid #0284c7;
   color: #38bdf8;
 }
 
-/* Retro Tabs & Pills */
+/* Tabs & Filter Pills */
 .retro-pill-active {
-  background-color: #1a261f;
-  border: 1px solid #84cc16;
-  color: #bef264;
-  box-shadow: 0 1px 0 #080d0a;
+  background-color: #162032;
+  border: 1px solid #10b981;
+  color: #34d399;
 }
 
 .retro-pill-inactive {
-  background-color: #101612;
-  border: 1px solid #1f2d24;
+  background-color: #0c1220;
+  border: 1px solid #1f293d;
   color: #94a3b8;
 }
 
 .retro-pill-inactive:hover {
-  background-color: #151e18;
+  background-color: #141c2c;
   color: #f1f5f9;
-  border-color: #2b3d32;
+  border-color: #2b3a54;
 }
 
 /* Minimalist Retro Scrollbar */

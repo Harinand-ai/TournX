@@ -512,26 +512,26 @@ export function OrganizerWorkspacePage({
       </div>
 
       {/* Visual Centerpiece: Master Tournament Prompt Creator */}
-      <div className="relative p-6 sm:p-8 rounded-2xl bg-[#0f1411] border border-[#23352a] shadow-2xl overflow-hidden">
-        {/* Subtle retro glowing ambient gradient */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-lime-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative p-6 sm:p-8 rounded-2xl bg-[#111827] border border-[#1f293d] shadow-xl overflow-hidden">
+        {/* Subtle glowing ambient gradient */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
         
         <div className="relative z-10 max-w-3xl mx-auto space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141d18] border border-lime-700/50 text-lime-400 text-[11px] font-pixel tracking-widest uppercase w-fit">
-              <Sparkles className="w-3.5 h-3.5 text-lime-400" />
-              <span>Master Tournament Engine</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#162032] border border-[#2b3a54] text-emerald-400 text-xs font-semibold w-fit">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Tournament Creation Engine</span>
             </div>
             
             <button
               type="button"
               onClick={() => setIsDraftsModalOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-[#141d18] hover:bg-[#19241e] border border-[#23352a] text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer w-fit"
+              className="px-3.5 py-1.5 rounded-xl bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-slate-200 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer w-fit"
             >
-              <FileText className="w-3.5 h-3.5 text-lime-400" />
-              <span>Drafts Vault</span>
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Saved Drafts</span>
               {draftsCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-lime-500/20 text-lime-400 text-[10px] font-bold">
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
                   {draftsCount}
                 </span>
               )}
@@ -539,10 +539,10 @@ export function OrganizerWorkspacePage({
           </div>
 
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight">
               Describe your tournament. Generate it. Review it. Confirm it.
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
               Type your tournament setup in natural English. Generate brackets, round-robin fixtures, squad rosters, and tie-breakers instantly.
             </p>
           </div>
@@ -553,12 +553,12 @@ export function OrganizerWorkspacePage({
               onChange={(e) => setMasterPromptText(e.target.value)}
               placeholder="e.g. Create an 8-team tournament with Arsenal, Chelsea, Liverpool, Spurs, Man City, Man United, Everton and Aston Villa at college ground tomorrow 5 pm"
               rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 font-sans placeholder:text-slate-600 transition shadow-inner resize-none"
+              className="w-full px-4 py-3 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 font-sans placeholder:text-slate-500 transition shadow-inner resize-none"
             />
 
             {/* Example chips */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-mono text-slate-500">Quick prompts:</span>
+              <span className="text-[11px] text-slate-400">Quick prompts:</span>
               {[
                 'Arsenal, Chelsea, Liverpool and Spurs league tomorrow 4pm',
                 '8-team knockout college cup at 5pm',
@@ -568,7 +568,7 @@ export function OrganizerWorkspacePage({
                   key={ex}
                   type="button"
                   onClick={() => setMasterPromptText(ex)}
-                  className="px-2.5 py-1 rounded-lg bg-[#141d18] hover:bg-[#1a261f] border border-[#23352a] text-slate-300 hover:text-lime-300 text-[11px] font-mono transition cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-slate-300 hover:text-white text-[11px] transition cursor-pointer"
                 >
                   "{ex}"
                 </button>
@@ -581,7 +581,7 @@ export function OrganizerWorkspacePage({
                 type="button"
                 onClick={handleSavePromptDraft}
                 disabled={!masterPromptText.trim()}
-                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#141d18] hover:bg-[#19241e] border border-[#23352a] text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
               >
                 <Save className="w-3.5 h-3.5 text-slate-400" />
                 <span>Save Prompt as Draft</span>
@@ -591,7 +591,7 @@ export function OrganizerWorkspacePage({
                 type="button"
                 onClick={handleLaunchMasterPrompt}
                 disabled={!masterPromptText.trim()}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-extrabold text-sm shadow-[0_0_20px_rgba(132,204,22,0.35)] transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 font-mono group"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-xs transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 group"
               >
                 <span>Generate Preview</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -599,7 +599,7 @@ export function OrganizerWorkspacePage({
             </div>
 
             {draftNotice && (
-              <p className="text-xs text-lime-400 font-mono text-center pt-1 animate-pulse">
+              <p className="text-xs text-emerald-400 text-center pt-1 animate-pulse">
                 {draftNotice}
               </p>
             )}
@@ -608,13 +608,13 @@ export function OrganizerWorkspacePage({
       </div>
 
       {/* Prominent Operational Prompt Box */}
-      <div className="p-5 rounded-2xl bg-[#0f1411] border border-[#1f2e26] shadow-lg">
+      <div className="p-5 rounded-2xl bg-[#111827] border border-[#1f293d] shadow-lg">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-lime-400 uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-lime-400 animate-pulse" />
-            <span>Tactical Management Terminal (Natural Language)</span>
+          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>Management Assistant (Natural Language)</span>
           </div>
-          <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+          <span className="text-[11px] text-slate-400 hidden sm:inline font-sans">
             try: "Record score as 2-1" or "Move match 3 to Saturday 5 PM"
           </span>
         </div>

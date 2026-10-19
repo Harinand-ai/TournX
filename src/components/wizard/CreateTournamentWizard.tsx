@@ -19,7 +19,8 @@ import {
   Trash2, 
   Edit3,
   Globe,
-  RotateCcw
+  RotateCcw,
+  FileText
 } from 'lucide-react';
 import { 
   parseTournamentPrompt, 
@@ -683,13 +684,13 @@ export function CreateTournamentWizard({
     <div className="w-full max-w-4xl mx-auto py-4 sm:py-6 px-3 sm:px-6">
       
       {/* Wizard Progress Stepper - Connected Horizontal Stepper */}
-      <div className="mb-6 bg-[#0f1411] border border-[#1f2e26] rounded-2xl p-4 sm:p-5 shadow-xl">
+      <div className="mb-6 bg-[#111827] border border-[#1f293d] rounded-2xl p-4 sm:p-5 shadow-xl">
         <div className="relative flex items-center justify-between max-w-3xl mx-auto px-2">
           {/* Background Connecting Track Line */}
-          <div className="absolute top-4 sm:top-5 left-8 right-8 h-0.5 bg-[#1f2e26] -z-0" />
-          {/* Active Lime Progress Track Line */}
+          <div className="absolute top-4 sm:top-5 left-8 right-8 h-0.5 bg-[#1f293d] -z-0" />
+          {/* Active Emerald Progress Track Line */}
           <div 
-            className="absolute top-4 sm:top-5 left-8 h-0.5 bg-lime-500 transition-all duration-300 -z-0"
+            className="absolute top-4 sm:top-5 left-8 h-0.5 bg-emerald-600 transition-all duration-300 -z-0"
             style={{ width: `${Math.min(100, Math.max(0, ((currentStep - 1) / 4) * 85))}%` }}
           />
 
@@ -712,19 +713,19 @@ export function CreateTournamentWizard({
                     }
                   }}
                   disabled={!isDone && currentStep < step && !tournamentDraft}
-                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-mono font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-xs sm:text-sm transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-lime-500 text-black shadow-[0_0_12px_rgba(132,204,22,0.4)] scale-105'
+                      ? 'bg-emerald-600 text-white shadow-sm scale-105'
                       : isDone
-                      ? 'bg-[#18231c] text-lime-400 border border-lime-700/60 shadow-xs'
-                      : 'bg-[#0b100d] text-slate-500 border border-[#23352a]'
+                      ? 'bg-[#162032] text-emerald-400 border border-emerald-600/50 shadow-xs'
+                      : 'bg-[#0b1120] text-slate-400 border border-[#222f46]'
                   }`}
                   aria-label={`Step ${step}: ${label}`}
                 >
-                  {isDone ? <Check className="w-4 h-4 stroke-[3]" /> : step}
+                  {isDone ? <Check className="w-4 h-4 stroke-[2.5]" /> : step}
                 </button>
-                <span className={`text-[11px] sm:text-xs mt-1.5 font-mono tracking-tight transition-colors ${
-                  isActive ? 'text-lime-400 font-bold' : isDone ? 'text-slate-300' : 'text-slate-500'
+                <span className={`text-[11px] sm:text-xs mt-1.5 font-sans tracking-tight transition-colors ${
+                  isActive ? 'text-emerald-400 font-bold' : isDone ? 'text-slate-300' : 'text-slate-400'
                 }`}>
                   {label}
                 </span>
@@ -735,22 +736,19 @@ export function CreateTournamentWizard({
       </div>
 
       {/* Main Wizard Step Box */}
-      <div className="bg-[#0f1411] border border-[#1f2e26] rounded-2xl shadow-2xl overflow-hidden text-[#f1f5f9]">
+      <div className="bg-[#111827] border border-[#1f293d] rounded-2xl shadow-xl overflow-hidden text-[#f8fafc]">
         
         {/* STEP 1: CONVERSATIONAL PROMPT INPUT */}
         {currentStep === 1 && (
           <div className="p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f2e26] pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f293d] pb-4">
               <div>
-                <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
-                  CORE TOURNAMENT CREATOR
-                </div>
-                <h1 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono tracking-tight flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-lime-400" />
+                <h1 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-emerald-400" />
                   <span>Describe your tournament. Generate it. Review it. Confirm it.</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
-                  Type your tournament setup in natural English. TournX extracts clubs, formats, squad sizes, and venues deterministically.
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
+                  Type your tournament setup in natural English. TournX extracts clubs, formats, squad sizes, and venues instantly.
                 </p>
               </div>
 
@@ -758,14 +756,15 @@ export function CreateTournamentWizard({
                 <button
                   type="button"
                   onClick={() => setIsDraftsModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-[#141d18] hover:bg-[#1a261f] text-lime-400 border border-[#273a2f] text-xs font-mono font-bold cursor-pointer transition flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#162032] hover:bg-[#1e2c44] text-slate-200 border border-[#2b3a54] text-xs font-semibold cursor-pointer transition flex items-center gap-1.5"
                 >
-                  <span>Drafts Vault</span>
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Saved Drafts</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setTournamentPromptText(BENCHMARK_TOURNAMENT_PROMPT)}
-                  className="px-3 py-1.5 rounded-lg bg-[#141d18] hover:bg-[#1a261f] text-slate-300 hover:text-white border border-[#273a2f] text-xs font-mono cursor-pointer transition flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#162032] hover:bg-[#1e2c44] text-slate-300 hover:text-white border border-[#2b3a54] text-xs font-medium cursor-pointer transition flex items-center gap-1.5"
                 >
                   <span>Load Kerala Cup</span>
                 </button>
@@ -820,7 +819,7 @@ export function CreateTournamentWizard({
                       setTournamentDraft(parsed);
                       setVisibility(parsed.visibility);
                     }}
-                    className="px-2.5 py-1 rounded-lg text-xs bg-[#141d18] hover:bg-[#1a261f] hover:text-lime-300 border border-[#24352b] text-slate-300 font-mono transition cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-xs bg-[#162032] hover:bg-[#1e2c44] hover:text-white border border-[#2b3a54] text-slate-300 transition cursor-pointer"
                   >
                     {ex.label}
                   </button>
@@ -829,7 +828,7 @@ export function CreateTournamentWizard({
             </div>
 
             <div>
-              <label htmlFor="tournament-prompt" className="block text-xs font-mono font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <label htmlFor="tournament-prompt" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
                 Tournament Prompt
               </label>
               <textarea
@@ -838,35 +837,35 @@ export function CreateTournamentWizard({
                 value={tournamentPromptText}
                 onChange={(e) => setTournamentPromptText(e.target.value)}
                 placeholder="e.g. Teams are A, B, C and D. Make a tournament. Or: Crystal Palace Fulham Dortmund Spurs at college ground tomorrow 5 pm"
-                className="w-full p-4 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:outline-none focus:border-lime-500 placeholder:text-slate-600 transition resize-none font-sans leading-relaxed shadow-inner"
+                className="w-full p-4 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 placeholder:text-slate-500 transition resize-none font-sans leading-relaxed shadow-inner"
               />
             </div>
 
             {/* Live Interpretation Summary Card */}
             {(tournamentDraft || liveParsedDraft) && (
-              <div className="p-4 rounded-xl bg-[#121c16] border border-lime-700/60 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#1f2e26] pb-2">
+              <div className="p-4 rounded-xl bg-[#0d1424] border border-[#1f293d] space-y-3">
+                <div className="flex items-center justify-between border-b border-[#1f293d] pb-2">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-lime-400" />
-                    <span className="text-xs font-mono font-bold text-lime-400 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
                       TournX Interpretation Summary
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono font-semibold text-lime-300 bg-lime-950/80 px-2 py-0.5 rounded border border-lime-700/60">
-                    Deterministic Local Parser
+                  <span className="text-[11px] font-medium text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                    Extracted Setup
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-slate-400 font-mono">Tournament Name:</span>
-                    <p className="font-bold text-[#f1f5f9] font-mono mt-0.5">
+                    <span className="text-slate-400">Tournament Name:</span>
+                    <p className="font-semibold text-[#f8fafc] mt-0.5">
                       {(tournamentDraft || liveParsedDraft)?.name || 'TournX Championship'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-mono">Format:</span>
-                    <p className="font-bold text-[#f1f5f9] font-mono mt-0.5">
+                    <span className="text-slate-400">Format:</span>
+                    <p className="font-semibold text-[#f8fafc] mt-0.5">
                       {((tournamentDraft || liveParsedDraft)?.format === 'SINGLE_ROUND_ROBIN' && 'Single Round-Robin (All-play-all once)') ||
                        ((tournamentDraft || liveParsedDraft)?.format === 'DOUBLE_ROUND_ROBIN' && 'Double Round-Robin (Home & Away)') ||
                        ((tournamentDraft || liveParsedDraft)?.format === 'SINGLE_ELIMINATION' && 'Knockout (Single Elimination)') ||
@@ -876,35 +875,35 @@ export function CreateTournamentWizard({
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-mono">Schedule:</span>
-                    <p className="font-semibold text-slate-300 font-mono mt-0.5">
+                    <span className="text-slate-400">Schedule:</span>
+                    <p className="font-medium text-slate-300 mt-0.5">
                       {(tournamentDraft || liveParsedDraft)?.startDateIso || (tournamentDraft || liveParsedDraft)?.startTime
                         ? `${(tournamentDraft || liveParsedDraft)?.startDateIso || ''} ${(tournamentDraft || liveParsedDraft)?.startTime || ''}`.trim()
                         : 'Not specified (editable)'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-mono">Venue:</span>
-                    <p className="font-semibold text-slate-300 font-mono mt-0.5">
+                    <span className="text-slate-400">Venue:</span>
+                    <p className="font-medium text-slate-300 mt-0.5">
                       {(tournamentDraft || liveParsedDraft)?.venue || 'Not specified (editable)'}
                     </p>
                   </div>
                 </div>
 
                 {/* Extracted Teams with Quick Badges and Inline Add */}
-                <div className="pt-2 border-t border-[#1f2e26]">
+                <div className="pt-2 border-t border-[#1f293d]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-mono font-bold text-slate-300">
+                    <span className="text-xs font-semibold text-slate-300">
                       Detected Teams ({(tournamentDraft || liveParsedDraft)?.teams.length || 0}):
                     </span>
-                    <span className="text-[11px] font-mono text-slate-500">Click &times; to remove</span>
+                    <span className="text-[11px] text-slate-400">Click &times; to remove</span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 items-center">
                     {(tournamentDraft || liveParsedDraft)?.teams.map((tName, idx) => (
                       <span
                         key={idx}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#141d18] text-lime-300 border border-[#273a2f] font-mono font-semibold text-xs"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#162032] text-emerald-300 border border-[#2b3a54] text-xs font-medium"
                       >
                         <span>{tName}</span>
                         <button
@@ -930,12 +929,12 @@ export function CreateTournamentWizard({
                           }
                         }}
                         placeholder="Add team..."
-                        className="px-2 py-1 text-xs rounded-lg border border-[#24352b] bg-[#0b100d] text-[#f1f5f9] placeholder:text-slate-600 focus:outline-none focus:border-lime-500 w-32 font-mono"
+                        className="px-2.5 py-1 text-xs rounded-lg border border-[#222f46] bg-[#0b1120] text-[#f8fafc] placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 w-32"
                       />
                       <button
                         type="button"
                         onClick={handleStep1AddTeam}
-                        className="px-2 py-1 text-xs rounded-lg bg-[#141d18] hover:bg-[#1f2e26] text-lime-400 font-mono font-semibold cursor-pointer border border-[#273a2f]"
+                        className="px-2.5 py-1 text-xs rounded-lg bg-[#162032] hover:bg-[#1e2c44] text-emerald-400 font-semibold cursor-pointer border border-[#2b3a54]"
                       >
                         Add
                       </button>
@@ -948,7 +947,7 @@ export function CreateTournamentWizard({
                   <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-mono font-bold">Clarification Needed:</p>
+                      <p className="font-bold">Clarification Needed:</p>
                       <p className="mt-0.5 font-sans">
                         {((tournamentDraft || liveParsedDraft)?.teams.length || 0) < 2
                           ? 'Please provide at least 2 teams to schedule tournament matches.'
@@ -960,11 +959,11 @@ export function CreateTournamentWizard({
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-[#1f2e26]">
+            <div className="flex items-center justify-between pt-2 border-t border-[#1f293d]">
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-4 py-2.5 rounded-xl border border-[#273a2f] text-slate-400 hover:text-white hover:bg-[#141d18] text-xs font-mono font-semibold transition cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-[#2b3a54] text-slate-300 hover:text-white hover:bg-[#162032] text-xs font-semibold transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -973,10 +972,10 @@ export function CreateTournamentWizard({
                 type="button"
                 disabled={!tournamentPromptText.trim() || isParsingTournament || (((tournamentDraft || liveParsedDraft)?.teams.length || 0) < 2)}
                 onClick={() => handleParseTournament()}
-                className="px-6 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 active:bg-lime-600 text-black font-mono font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-semibold text-xs uppercase tracking-wider flex items-center gap-2 shadow-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {isParsingTournament ? (
-                  <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 ) : (
                   <>
                     <span>Generate Preview & Review Fixtures</span>
@@ -991,15 +990,12 @@ export function CreateTournamentWizard({
         {/* STEP 2: TOURNAMENT PREVIEW & REFINEMENT */}
         {currentStep === 2 && tournamentDraft && (
           <div className="p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f2e26] pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f293d] pb-4">
               <div>
-                <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
-                  TACTICAL BLUEPRINT
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono">
+                <h2 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight">
                   Step 2 — Tournament Preview & Rules
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
                   Review extracted rules, format, and clubs. Modify parameters or proceed to squad rosters.
                 </p>
               </div>
@@ -1340,16 +1336,13 @@ export function CreateTournamentWizard({
         {/* STEP 3: ADD TEAMS, PLAYERS & MANAGERS VIA PROMPT */}
         {currentStep === 3 && tournamentDraft && (
           <div className="p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f2e26] pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1f293d] pb-4">
               <div>
-                <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
-                  TACTICAL ROSTERS
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono flex items-center gap-2">
-                  <Users className="w-5 h-5 text-lime-400" />
+                <h2 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight flex items-center gap-2">
+                  <Users className="w-5 h-5 text-emerald-400" />
                   <span>Step 3 — Teams, Players & Managers</span>
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
                   Describe your rosters in one prompt, or configure them club by club.
                 </p>
               </div>
@@ -1819,15 +1812,12 @@ export function CreateTournamentWizard({
         {/* STEP 4: OPTIONAL TOURNAMENT FEATURES */}
         {currentStep === 4 && (
           <div className="p-6 sm:p-8 space-y-6">
-            <div className="border-b border-[#1f2e26] pb-4">
-              <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
-                COMPETITION RULES
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono flex items-center gap-2">
-                <Settings className="w-5 h-5 text-lime-400" />
+            <div className="border-b border-[#1f293d] pb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight flex items-center gap-2">
+                <Settings className="w-5 h-5 text-emerald-400" />
                 <span>Step 4 — Optional Features & Rules</span>
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
                 Customize advanced controls. You can update these rules anytime during the tournament.
               </p>
             </div>
@@ -1926,16 +1916,13 @@ export function CreateTournamentWizard({
           <div className="p-6 sm:p-8 space-y-6">
             {!publishedTournament ? (
               <>
-                <div className="border-b border-[#1f2e26] pb-4">
-                  <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
-                    CONFIRMATION & DEPLOYMENT
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-lime-400" />
+                <div className="border-b border-[#1f293d] pb-4">
+                  <h2 className="text-xl sm:text-2xl font-bold text-[#f8fafc] tracking-tight flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-emerald-400" />
                     <span>Final Review & Save</span>
                   </h2>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
-                    Your tournament configuration is ready. Save it as a draft in your vault or launch it immediately.
+                  <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans leading-relaxed">
+                    Your tournament configuration is ready. Save it as a draft or launch it immediately.
                   </p>
                 </div>
 
@@ -2023,53 +2010,53 @@ export function CreateTournamentWizard({
                 {/* Unique Access Credentials Cards */}
                 <div className="max-w-lg mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                   {/* Participant Viewer Code */}
-                  <div className="p-4 rounded-xl bg-[#0b100d] border border-[#23352a] space-y-1.5">
-                    <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                  <div className="p-4 rounded-xl bg-[#0b1120] border border-[#1f293d] space-y-1.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       Participant Access Code
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-base font-extrabold text-lime-400 tracking-wider">
-                        {viewerAccessCode || 'TX-VIEW-DEV'}
+                      <span className="font-mono text-base font-extrabold text-emerald-400 tracking-wider">
+                        {viewerAccessCode || 'TX-VIEW-9876'}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(viewerAccessCode || 'TX-VIEW-DEV');
+                          navigator.clipboard.writeText(viewerAccessCode || 'TX-VIEW-9876');
                           setCopiedViewerCode(true);
                           setTimeout(() => setCopiedViewerCode(false), 2000);
                         }}
-                        className="p-1.5 rounded-lg bg-[#141d18] border border-[#23352a] hover:bg-[#19241e] text-slate-300 text-xs font-semibold cursor-pointer shadow-xs"
+                        className="p-1.5 rounded-lg bg-[#162032] border border-[#2b3a54] hover:bg-[#1e2c44] text-slate-300 text-xs font-semibold cursor-pointer shadow-xs"
                       >
-                        {copiedViewerCode ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedViewerCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-sans">
+                    <p className="text-[11px] text-slate-400 font-sans">
                       Participants enter this code to join without creating an account.
                     </p>
                   </div>
 
                   {/* Collaborator Modifier Code */}
-                  <div className="p-4 rounded-xl bg-[#0b100d] border border-[#23352a] space-y-1.5">
-                    <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+                  <div className="p-4 rounded-xl bg-[#0b1120] border border-[#1f293d] space-y-1.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       Modifier Access Code
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-base font-extrabold text-lime-400 tracking-wider">
-                        {modifierAccessCode || 'TX-SCORE-DEV'}
+                      <span className="font-mono text-base font-extrabold text-emerald-400 tracking-wider">
+                        {modifierAccessCode || 'TX-SCORE-9876'}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard.writeText(modifierAccessCode || 'TX-SCORE-DEV');
+                          navigator.clipboard.writeText(modifierAccessCode || 'TX-SCORE-9876');
                           setCopiedModifierCode(true);
                           setTimeout(() => setCopiedModifierCode(false), 2000);
                         }}
-                        className="p-1.5 rounded-lg bg-[#141d18] border border-[#23352a] hover:bg-[#19241e] text-slate-300 text-xs font-semibold cursor-pointer shadow-xs"
+                        className="p-1.5 rounded-lg bg-[#162032] border border-[#2b3a54] hover:bg-[#1e2c44] text-slate-300 text-xs font-semibold cursor-pointer shadow-xs"
                       >
-                        {copiedModifierCode ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedModifierCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-sans">
+                    <p className="text-[11px] text-slate-400 font-sans">
                       Co-organizers enter this code to enter live scores and match results.
                     </p>
                   </div>

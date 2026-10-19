@@ -783,47 +783,6 @@ export function App() {
         sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
       />
 
-      {/* TournX Development Banner */}
-      <div className="w-full bg-[#0d1411] border-b border-[#1f2e26] px-4 sm:px-6 py-2 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2 shadow-xs font-mono">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold px-2 py-0.5 bg-[#141d18] text-lime-400 border border-lime-800/60 rounded text-[10px] uppercase font-mono tracking-wider shrink-0">
-            DEV MODE
-          </span>
-          <button
-            onClick={() => setIsSwitcherOpen(true)}
-            className="font-bold text-slate-200 hover:text-lime-400 flex items-center gap-1.5 truncate cursor-pointer transition"
-            title="Switch tournament"
-          >
-            <Trophy className="w-3.5 h-3.5 text-lime-400 shrink-0" />
-            <span className="truncate">{activeTournament?.name || 'TournX Championship'}</span>
-          </button>
-          <span className="text-slate-500 text-[11px] hidden sm:inline">
-            • think.prompt.organise
-          </span>
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => handleNavigate('organize')}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-lime-400 hover:text-lime-300 cursor-pointer transition font-mono"
-          >
-            <Plus className="w-3 h-3" />
-            <span>Prompt Creator</span>
-          </button>
-
-          <button
-            onClick={async () => {
-              localDataService.resetDemoData();
-              await loadData();
-            }}
-            className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 font-medium cursor-pointer transition font-mono"
-            title="Reset demo tournament only (custom tournaments preserved)"
-          >
-            <RefreshCw className="w-3 h-3" />
-            <span>Reset Demo</span>
-          </button>
-        </div>
-      </div>
 
       {/* Main Page Body */}
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-20 md:pb-8">

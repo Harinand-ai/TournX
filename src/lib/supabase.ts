@@ -119,6 +119,27 @@ export async function resendConfirmationEmail(email: string): Promise<{ success:
 }
 
 /**
+ * Sends a password reset email to the specified address
+ */
+export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase authentication service is not configured.' };
+  }
+  try {
+    const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}/#admin-login` : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: redirectUrl,
+    });
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to send password reset email.' };
+  }
+}
+
+/**
  * Returns true if real Supabase authentication is active and configured
  */
 export function isRemoteAuthAvailable(): boolean {

@@ -5,19 +5,16 @@ import {
   Users, 
   Sparkles, 
   ArrowRight, 
-  Lock, 
-  Globe, 
   CheckCircle, 
   AlertCircle, 
   Key, 
   LogIn, 
   UserPlus,
-  Play,
-  Shield,
   Eye,
-  Sliders
+  Sliders,
+  Mail
 } from 'lucide-react';
-import { supabase, isSupabaseConfigured, getSupabaseProjectHost, resendConfirmationEmail } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, resendConfirmationEmail, sendPasswordResetEmail } from '../lib/supabase';
 import { localDataService } from '../services/localDataService';
 import { tournamentService } from '../services/tournamentService';
 import { Tournament } from '../types/multiTenant';
@@ -40,16 +37,13 @@ export function LandingPage({
   // Main Tab: 'ORGANIZE' | 'JOIN'
   const [activeAction, setActiveAction] = useState<'ORGANIZE' | 'JOIN'>('ORGANIZE');
 
-  // Organizer Auth Mode: Default to 'SIGN_IN' for existing organizers
-  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP'>('SIGN_IN');
+  // Organizer Auth Mode: 'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'
+  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'>('SIGN_IN');
 
   // Sign up / Sign in fields
   const [organizerName, setOrganizerName] = useState('');
   const [organizerEmail, setOrganizerEmail] = useState('');
   const [organizerPassword, setOrganizerPassword] = useState('');
-  const [tournamentName, setTournamentName] = useState('');
-  const [tournamentDescription, setTournamentDescription] = useState('');
-  const [tournamentVisibility, setTournamentVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
 
   // Join fields
   const [joinCodeOrLink, setJoinCodeOrLink] = useState('');
@@ -85,11 +79,6 @@ export function LandingPage({
       return;
     }
 
-    if (!tournamentName.trim()) {
-      setErrorMessage('Please provide a name for your first tournament.');
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -105,23 +94,11 @@ export function LandingPage({
         });
 
         if (error) {
-          console.error('[TournX Organizer SignUp Error]', {
-            code: (error as any).code,
-            status: (error as any).status,
-            message: error.message
-          });
           throw new Error(error.message);
         }
 
         if (data.session) {
-          if (!isSupabaseConfigured) {
-            localDataService.setDevAdminLoggedIn(true);
-          }
-          onOrganizeClick({
-            name: tournamentName.trim(),
-            description: tournamentDescription.trim(),
-            visibility: tournamentVisibility,
-          });
+          onOrganizeClick();
           return;
         } else if (data.user && !data.session) {
           if (data.user.identities && data.user.identities.length === 0) {
@@ -143,16 +120,39 @@ export function LandingPage({
 
       if (import.meta.env.DEV) {
         localDataService.setDevAdminLoggedIn(true);
-        onOrganizeClick({
-          name: tournamentName.trim(),
-          description: tournamentDescription.trim(),
-          visibility: tournamentVisibility,
-        });
+        onOrganizeClick();
       } else {
-        throw new Error('Supabase backend service is required for organizer registration in production.');
+        throw new Error('Authentication service is currently unavailable.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Registration failed. Please check your details.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Password Reset Request
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setConfirmationNotice(null);
+
+    const cleanEmail = organizerEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your email address to receive password reset instructions.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await sendPasswordResetEmail(cleanEmail);
+      if (res.success) {
+        setConfirmationNotice(`Password reset instructions sent to ${cleanEmail}. Please check your inbox.`);
+      } else {
+        setErrorMessage(res.error || 'Failed to send password reset email.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Error sending password reset email.');
     } finally {
       setIsLoading(false);
     }
@@ -183,28 +183,20 @@ export function LandingPage({
         });
 
         if (error) {
-          console.error('[TournX Organizer SignIn Error]', {
-            code: (error as any).code,
-            status: (error as any).status,
-            message: error.message,
-            targetHost: getSupabaseProjectHost()
-          });
-
           const isUnconfirmed = 
             (error as any).code === 'email_not_confirmed' ||
             error.message.toLowerCase().includes('email not confirmed');
 
           if (isUnconfirmed) {
             setIsUnconfirmedError(true);
-            const projectHost = getSupabaseProjectHost();
             setErrorMessage(
-              `Email not confirmed for ${cleanEmail} on ${projectHost || 'Supabase'}. If you confirmed this account previously, ensure you are using the correct credentials and project. If you need a new confirmation email, click below.`
+              `Email not confirmed for ${cleanEmail}. Please verify your email or click resend below.`
             );
             return;
           }
 
           if ((error as any).code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) {
-            setErrorMessage('Invalid email or password. Please verify your credentials and check caps lock.');
+            setErrorMessage('Invalid email or password. Please verify your credentials.');
             return;
           }
 
@@ -212,9 +204,6 @@ export function LandingPage({
         }
 
         if (data.user) {
-          if (!isSupabaseConfigured) {
-            localDataService.setDevAdminLoggedIn(true);
-          }
           onOrganizeClick();
           return;
         }
@@ -225,10 +214,10 @@ export function LandingPage({
         localDataService.setDevAdminLoggedIn(true);
         onOrganizeClick();
       } else {
-        throw new Error('Supabase backend service is required for organizer sign-in in production.');
+        throw new Error('Authentication service is currently unavailable.');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Invalid email or password.');
+      setErrorMessage(err.message || 'Authentication error.');
     } finally {
       setIsLoading(false);
     }
@@ -345,11 +334,11 @@ export function LandingPage({
           <span>THINK • PROMPT • ORGANISE</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-[#f1f5f9] mb-3">
-          Tourn<span className="text-lime-400 font-pixel">X</span>
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#f8fafc] mb-3">
+          Tourn<span className="text-emerald-400 font-pixel">X</span>
         </h1>
         <p className="text-sm sm:text-base text-slate-400 max-w-md mx-auto font-sans leading-relaxed">
-          Retro-inspired football tournament management. Instant fixtures, live scoreboards & squad tactics.
+          Professional football tournament management. Instant fixtures, live scoreboards & squad management.
         </p>
       </div>
 
@@ -362,23 +351,23 @@ export function LandingPage({
       )}
 
       {/* Main Console Card */}
-      <div className="w-full max-w-lg bg-[#0f1411] border border-[#1f2e26] rounded-2xl shadow-2xl overflow-hidden relative z-10">
+      <div className="w-full max-w-lg bg-[#111827] border border-[#1f293d] rounded-2xl shadow-xl overflow-hidden relative z-10">
         
-        {/* Retro Header Strip */}
-        <div className="grid grid-cols-2 p-1.5 bg-[#090d0b] border-b border-[#1f2e26]">
+        {/* Navigation Tabs Strip */}
+        <div className="grid grid-cols-2 p-1.5 bg-[#0b101d] border-b border-[#1f293d]">
           <button
             type="button"
             onClick={() => {
               setActiveAction('ORGANIZE');
               setErrorMessage(null);
             }}
-            className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
               activeAction === 'ORGANIZE'
-                ? 'bg-[#18231c] text-lime-400 border border-[#2f483a] shadow-inner'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#131b16]'
+                ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54] shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
             }`}
           >
-            <Trophy className="w-4 h-4 text-lime-400" />
+            <Trophy className="w-4 h-4 text-emerald-400" />
             <span>Organize</span>
           </button>
 
@@ -388,13 +377,13 @@ export function LandingPage({
               setActiveAction('JOIN');
               setErrorMessage(null);
             }}
-            className={`flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold tracking-wide transition-all cursor-pointer ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
               activeAction === 'JOIN'
-                ? 'bg-[#18231c] text-lime-400 border border-[#2f483a] shadow-inner'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#131b16]'
+                ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54] shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
             }`}
           >
-            <Users className="w-4 h-4 text-lime-400" />
+            <Users className="w-4 h-4 text-emerald-400" />
             <span>Join Matchday</span>
           </button>
         </div>
@@ -404,21 +393,21 @@ export function LandingPage({
           
           {/* Notifications */}
           {confirmationNotice && (
-            <div className="mb-5 p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 text-blue-300 text-xs flex items-start gap-2.5">
+            <div className="mb-5 p-3.5 rounded-xl bg-blue-950/40 border border-blue-800/60 text-blue-300 text-xs flex items-start gap-2.5">
               <CheckCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
               <span>{confirmationNotice}</span>
             </div>
           )}
 
           {resendStatus && (
-            <div className="mb-5 p-4 rounded-xl bg-lime-950/40 border border-lime-800/60 text-lime-300 text-xs flex items-start gap-2.5">
-              <CheckCircle className="w-4 h-4 text-lime-400 shrink-0 mt-0.5" />
+            <div className="mb-5 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <span>{resendStatus}</span>
             </div>
           )}
 
           {errorMessage && (
-            <div className="mb-5 p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2.5">
+            <div className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2.5">
               <div className="flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <span className="flex-1">{errorMessage}</span>
@@ -430,7 +419,7 @@ export function LandingPage({
                     type="button"
                     onClick={handleResendConfirmation}
                     disabled={isResending}
-                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
                   >
                     {isResending ? 'Sending...' : 'Resend Email'}
                   </button>
@@ -451,198 +440,233 @@ export function LandingPage({
                 transition={{ duration: 0.15 }}
               >
                 {/* Sign up / Sign in Toggle */}
-                <div className="flex items-center justify-between mb-5 border-b border-[#1f2e26] pb-3">
-                  <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
-                    {authMode === 'SIGN_UP' ? 'New Manager Registration' : 'Manager Terminal Login'}
+                <div className="flex items-center justify-between mb-5 border-b border-[#1f293d] pb-3">
+                  <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+                    {authMode === 'SIGN_UP' ? 'Organizer Registration' : authMode === 'FORGOT_PASSWORD' ? 'Password Recovery' : 'Organizer Sign In'}
                   </span>
                   
                   <div className="flex items-center gap-2 text-xs">
                     <button
                       type="button"
                       onClick={() => {
-                        setAuthMode('SIGN_UP');
+                        setAuthMode('SIGN_IN');
                         setErrorMessage(null);
+                        setConfirmationNotice(null);
                       }}
                       className={`font-semibold cursor-pointer transition ${
-                        authMode === 'SIGN_UP' ? 'text-lime-400 underline underline-offset-4' : 'text-slate-500 hover:text-slate-300'
+                        authMode === 'SIGN_IN' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Sign Up
+                      Sign In
                     </button>
                     <span className="text-slate-600">•</span>
                     <button
                       type="button"
                       onClick={() => {
-                        setAuthMode('SIGN_IN');
+                        setAuthMode('SIGN_UP');
                         setErrorMessage(null);
+                        setConfirmationNotice(null);
                       }}
                       className={`font-semibold cursor-pointer transition ${
-                        authMode === 'SIGN_IN' ? 'text-lime-400 underline underline-offset-4' : 'text-slate-500 hover:text-slate-300'
+                        authMode === 'SIGN_UP' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      Sign In
+                      Sign Up
                     </button>
                   </div>
                 </div>
 
-                {/* Form: SIGN UP */}
-                {authMode === 'SIGN_UP' && (
-                  <form onSubmit={handleOrganizerSignUp} className="space-y-4">
+                {/* Form: SIGN IN */}
+                {authMode === 'SIGN_IN' && (
+                  <form onSubmit={handleOrganizerSignIn} className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-300">Manager Name</label>
-                      <input
-                        type="text"
-                        value={organizerName}
-                        onChange={(e) => setOrganizerName(e.target.value)}
-                        placeholder="e.g. Alex Ferguson"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-300">Email Address *</label>
+                      <label className="text-xs font-semibold text-slate-300">Email Address</label>
                       <input
                         type="email"
                         required
                         value={organizerEmail}
                         onChange={(e) => setOrganizerEmail(e.target.value)}
-                        placeholder="manager@club.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-300">Password *</label>
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-slate-300">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthMode('FORGOT_PASSWORD');
+                            setErrorMessage(null);
+                            setConfirmationNotice(null);
+                          }}
+                          className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                        >
+                          Forgot password?
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        required
+                        value={organizerPassword}
+                        onChange={(e) => setOrganizerPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      ) : (
+                        <>
+                          <LogIn className="w-4 h-4" />
+                          <span>Sign In to Organizer</span>
+                          <ArrowRight className="w-4 h-4 ml-1" />
+                        </>
+                      )}
+                    </button>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('SIGN_UP');
+                          setErrorMessage(null);
+                          setConfirmationNotice(null);
+                        }}
+                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                      >
+                        Don't have an account? <span className="font-semibold text-emerald-400">Sign Up</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Form: SIGN UP */}
+                {authMode === 'SIGN_UP' && (
+                  <form onSubmit={handleOrganizerSignUp} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">Organizer Name (Optional)</label>
+                      <input
+                        type="text"
+                        value={organizerName}
+                        onChange={(e) => setOrganizerName(e.target.value)}
+                        placeholder="e.g. Alex Ferguson"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">Email Address *</label>
+                      <input
+                        type="email"
+                        required
+                        value={organizerEmail}
+                        onChange={(e) => setOrganizerEmail(e.target.value)}
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-300">Password *</label>
                       <input
                         type="password"
                         required
                         value={organizerPassword}
                         onChange={(e) => setOrganizerPassword(e.target.value)}
                         placeholder="At least 6 characters"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
                       />
-                    </div>
-
-                    <div className="pt-2 border-t border-[#1f2e26] space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-300">Tournament Name *</label>
-                        <input
-                          type="text"
-                          required
-                          value={tournamentName}
-                          onChange={(e) => setTournamentName(e.target.value)}
-                          placeholder="e.g. Kerala Monsoon Super League"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setTournamentVisibility('PUBLIC')}
-                          className={`py-2 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                            tournamentVisibility === 'PUBLIC'
-                              ? 'bg-lime-950/40 text-lime-300 border-lime-500'
-                              : 'bg-[#0b100d] text-slate-400 border-[#23352a]'
-                          }`}
-                        >
-                          <Globe className="w-3.5 h-3.5" />
-                          <span>Public</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setTournamentVisibility('PRIVATE')}
-                          className={`py-2 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                            tournamentVisibility === 'PRIVATE'
-                              ? 'bg-lime-950/40 text-lime-300 border-lime-500'
-                              : 'bg-[#0b100d] text-slate-400 border-[#23352a]'
-                          }`}
-                        >
-                          <Lock className="w-3.5 h-3.5" />
-                          <span>Private</span>
-                        </button>
-                      </div>
                     </div>
 
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full mt-3 py-3 px-4 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                     >
                       {isLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                       ) : (
                         <>
                           <UserPlus className="w-4 h-4" />
-                          <span>Create Account & Setup</span>
+                          <span>Create Organizer Account</span>
                           <ArrowRight className="w-4 h-4 ml-1" />
                         </>
                       )}
                     </button>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('SIGN_IN');
+                          setErrorMessage(null);
+                          setConfirmationNotice(null);
+                        }}
+                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                      >
+                        Already have an account? <span className="font-semibold text-emerald-400">Sign In</span>
+                      </button>
+                    </div>
                   </form>
                 )}
 
-                {/* Form: SIGN IN */}
-                {authMode === 'SIGN_IN' && (
-                  <form onSubmit={handleOrganizerSignIn} className="space-y-4">
+                {/* Form: FORGOT PASSWORD */}
+                {authMode === 'FORGOT_PASSWORD' && (
+                  <form onSubmit={handlePasswordReset} className="space-y-4">
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Enter the email address associated with your organizer account, and we will send you a link to reset your password.
+                    </p>
+
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-300">Manager Email</label>
+                      <label className="text-xs font-semibold text-slate-300">Email Address</label>
                       <input
                         type="email"
                         required
                         value={organizerEmail}
                         onChange={(e) => setOrganizerEmail(e.target.value)}
-                        placeholder="manager@club.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-300">Password</label>
-                      <input
-                        type="password"
-                        required
-                        value={organizerPassword}
-                        onChange={(e) => setOrganizerPassword(e.target.value)}
-                        placeholder="Your manager password"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition placeholder:text-slate-600"
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full mt-3 py-3 px-4 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                     >
                       {isLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                       ) : (
                         <>
-                          <LogIn className="w-4 h-4" />
-                          <span>Open Manager Terminal</span>
+                          <Mail className="w-4 h-4" />
+                          <span>Send Reset Link</span>
                           <ArrowRight className="w-4 h-4 ml-1" />
                         </>
                       )}
                     </button>
-                  </form>
-                )}
 
-                {/* Instant Demo Sandbox Shortcut (strictly local development only) */}
-                {import.meta.env.DEV && !isSupabaseConfigured && (
-                  <div className="mt-6 pt-4 border-t border-[#1f2e26] text-center">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        localDataService.setDevAdminLoggedIn(true);
-                        onOrganizeClick();
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs font-mono text-lime-400/80 hover:text-lime-300 transition cursor-pointer"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                      <span>Launch local demo tournament without account</span>
-                    </button>
-                  </div>
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('SIGN_IN');
+                          setErrorMessage(null);
+                          setConfirmationNotice(null);
+                        }}
+                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                      >
+                        Return to <span className="font-semibold text-emerald-400">Sign In</span>
+                      </button>
+                    </div>
+                  </form>
                 )}
               </motion.div>
             )}
@@ -658,14 +682,14 @@ export function LandingPage({
                 className="space-y-5"
               >
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Enter an access code, matchday pass, or tournament slug to enter the retro scoreboard.
+                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                    Enter an access code, matchday pass, or tournament slug to view live fixtures and standings.
                   </p>
                 </div>
 
                 {joinSuccess && (
-                  <div className="p-3.5 rounded-xl bg-lime-950/40 border border-lime-800/60 text-lime-300 text-xs flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-lime-400 shrink-0" />
+                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>{joinSuccess}</span>
                   </div>
                 )}
@@ -679,7 +703,7 @@ export function LandingPage({
 
                 <form onSubmit={handleJoinSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-mono uppercase text-slate-300">
+                    <label className="text-xs font-semibold text-slate-300">
                       Matchday Pass / Access Code / Slug
                     </label>
                     <div className="relative">
@@ -689,16 +713,16 @@ export function LandingPage({
                         value={joinCodeOrLink}
                         onChange={(e) => setJoinCodeOrLink(e.target.value)}
                         placeholder="e.g. TX-VIEW-9876 or tournx-championship"
-                        className="w-full px-3.5 py-3 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:border-lime-500 focus:ring-1 focus:ring-lime-500/30 transition pl-10 font-mono placeholder:text-slate-600"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition pl-10 font-mono placeholder:text-slate-500"
                       />
-                      <Key className="w-4 h-4 text-lime-400/70 absolute left-3.5 top-3.5" />
+                      <Key className="w-4 h-4 text-emerald-400/80 absolute left-3.5 top-3" />
                     </div>
                   </div>
 
                   {/* Built-in Demo Passes One-Click Helper */}
-                  <div className="p-3 rounded-xl bg-[#131b16] border border-[#1f2e26] space-y-2">
-                    <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                      <span>Built-in Demo Tournament Passes:</span>
+                  <div className="p-3.5 rounded-xl bg-[#0b1120] border border-[#1f293d] space-y-2">
+                    <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+                      Demo Tournament Passes:
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -707,13 +731,13 @@ export function LandingPage({
                           setJoinCodeOrLink('TX-VIEW-9876');
                           setJoinError(null);
                         }}
-                        className="py-1.5 px-2.5 rounded-lg bg-[#18241c] hover:bg-[#203126] border border-[#2b3f32] text-left transition cursor-pointer group"
+                        className="py-2 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-left transition cursor-pointer group"
                       >
-                        <div className="flex items-center gap-1.5 text-lime-400 font-mono text-xs font-bold">
-                          <Eye className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
+                          <Eye className="w-3.5 h-3.5" />
                           <span>TX-VIEW-9876</span>
                         </div>
-                        <div className="text-[10px] text-slate-400">Spectator Pass</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Spectator Pass</div>
                       </button>
 
                       <button
@@ -722,13 +746,13 @@ export function LandingPage({
                           setJoinCodeOrLink('TX-SCORE-9876');
                           setJoinError(null);
                         }}
-                        className="py-1.5 px-2.5 rounded-lg bg-[#18241c] hover:bg-[#203126] border border-[#2b3f32] text-left transition cursor-pointer group"
+                        className="py-2 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-left transition cursor-pointer group"
                       >
-                        <div className="flex items-center gap-1.5 text-lime-400 font-mono text-xs font-bold">
-                          <Sliders className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
+                          <Sliders className="w-3.5 h-3.5" />
                           <span>TX-SCORE-9876</span>
                         </div>
-                        <div className="text-[10px] text-slate-400">Scorekeeper Pass</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Scorekeeper Pass</div>
                       </button>
                     </div>
                   </div>
@@ -736,10 +760,10 @@ export function LandingPage({
                   <button
                     type="submit"
                     disabled={isVerifyingCode}
-                    className="w-full py-3 px-4 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
                   >
                     {isVerifyingCode ? (
-                      <div className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                      <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     ) : (
                       <>
                         <span>Enter Tournament</span>
@@ -750,20 +774,20 @@ export function LandingPage({
                 </form>
 
                 {/* Instant Public Showcase Card */}
-                <div className="mt-6 pt-5 border-t border-[#1f2e26]">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#121814] border border-[#202e25]">
+                <div className="mt-6 pt-5 border-t border-[#1f293d]">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0b1120] border border-[#1f293d]">
                     <div className="min-w-0 pr-2">
                       <div className="text-xs font-bold text-slate-200 truncate">
                         {activeTournament?.name || 'TournX Championship'}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-mono">
+                      <div className="text-[11px] text-slate-400 font-sans mt-0.5">
                         Live Public Showcase
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={onOpenPublicDemo}
-                      className="shrink-0 py-1.5 px-3 rounded-lg bg-[#1a251f] hover:bg-[#23332a] border border-[#2b3e32] text-xs font-bold text-lime-400 transition cursor-pointer"
+                      className="shrink-0 py-1.5 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-xs font-semibold text-emerald-400 transition cursor-pointer"
                     >
                       View Live Scoreboard
                     </button>
@@ -777,9 +801,9 @@ export function LandingPage({
         </div>
       </div>
 
-      {/* Retro Arcade Footer */}
-      <div className="mt-8 text-center text-xs font-mono text-slate-500 tracking-wider">
-        TournX • RETRO SPORTS MANAGEMENT ENGINE • SECURE & ISOLATED
+      {/* Clean Professional Footer */}
+      <div className="mt-8 text-center text-xs text-slate-500 tracking-wide font-sans">
+        TournX • Professional Sports Management • Real-time Sync & Isolated Tenancy
       </div>
 
     </div>
