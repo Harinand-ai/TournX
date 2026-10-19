@@ -157,11 +157,12 @@ export function App() {
     return urlParams.get('intro') === 'true';
   });
 
-  // Wizard initial data passed from organizer sign up
+  // Wizard initial data passed from organizer sign up or workspace prompt
   const [wizardInitialData, setWizardInitialData] = useState<{
     name?: string;
     description?: string;
     visibility?: 'PUBLIC' | 'PRIVATE';
+    prompt?: string;
   } | undefined>(undefined);
 
   // Admin auth & session state
@@ -555,6 +556,12 @@ export function App() {
               standings={standings}
               onDataChanged={loadData}
               onNavigateHome={() => handleNavigate('landing')}
+              onNavigateToCreate={(prompt) => {
+                if (prompt) {
+                  setWizardInitialData({ prompt });
+                }
+                handleNavigate('organize');
+              }}
               onTournamentDeleted={handleTournamentDeleted}
               onLogout={handleAdminLogout}
             />
@@ -743,7 +750,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-900 font-sans selection:bg-emerald-100 selection:text-emerald-900">
+    <div className="min-h-screen flex flex-col bg-[#0a0d0b] text-[#f1f5f9] font-sans selection:bg-lime-500 selection:text-black retro-dot-grid">
       
       {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (
@@ -764,20 +771,20 @@ export function App() {
       />
 
       {/* TournX Development Banner */}
-      <div className="w-full bg-white border-b border-slate-200 px-4 sm:px-6 py-2 text-xs text-slate-600 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+      <div className="w-full bg-[#0d1411] border-b border-[#1f2e26] px-4 sm:px-6 py-2 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2 shadow-xs font-mono">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[10px] uppercase font-sans tracking-wider shrink-0">
+          <span className="font-bold px-2 py-0.5 bg-[#141d18] text-lime-400 border border-lime-800/60 rounded text-[10px] uppercase font-mono tracking-wider shrink-0">
             DEV MODE
           </span>
           <button
             onClick={() => setIsSwitcherOpen(true)}
-            className="font-bold text-slate-800 hover:text-emerald-700 flex items-center gap-1.5 truncate cursor-pointer transition"
+            className="font-bold text-slate-200 hover:text-lime-400 flex items-center gap-1.5 truncate cursor-pointer transition"
             title="Switch tournament"
           >
-            <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <Trophy className="w-3.5 h-3.5 text-lime-400 shrink-0" />
             <span className="truncate">{activeTournament?.name || 'TournX Championship'}</span>
           </button>
-          <span className="text-slate-400 text-[11px] hidden sm:inline">
+          <span className="text-slate-500 text-[11px] hidden sm:inline">
             • think.prompt.organise
           </span>
         </div>
@@ -785,10 +792,10 @@ export function App() {
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => handleNavigate('organize')}
-            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer transition"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-lime-400 hover:text-lime-300 cursor-pointer transition font-mono"
           >
             <Plus className="w-3 h-3" />
-            <span>Prompt Tournament Creator</span>
+            <span>Prompt Creator</span>
           </button>
 
           <button
@@ -796,7 +803,7 @@ export function App() {
               localDataService.resetDemoData();
               await loadData();
             }}
-            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer transition"
+            className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 font-medium cursor-pointer transition font-mono"
             title="Reset demo tournament only (custom tournaments preserved)"
           >
             <RefreshCw className="w-3 h-3" />

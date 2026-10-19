@@ -8,44 +8,44 @@ interface FooterProps {
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   return (
-    <footer className="w-full bg-white border-t border-slate-200 text-slate-600 mt-16 pb-20 md:pb-8">
+    <footer className="w-full bg-[#0c120e] border-t border-[#1f2e26] text-slate-400 mt-16 pb-20 md:pb-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           
           {/* Brand info */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-center text-emerald-700 font-bold text-xs">
+              <div className="w-7 h-7 bg-[#141d18] border border-lime-700/60 rounded-lg flex items-center justify-center text-lime-400 font-bold text-xs shadow-xs">
                 <Trophy className="w-3.5 h-3.5" />
               </div>
-              <span className="font-extrabold text-slate-900 text-sm tracking-tight">
-                Tourn<span className="text-emerald-700">X</span>
+              <span className="font-pixel text-[#f1f5f9] text-sm tracking-wider uppercase">
+                Tourn<span className="text-lime-400">X</span>
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">
+            <p className="text-xs font-mono text-lime-400 font-medium">
               think.prompt.organise
             </p>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Modern football tournament management platform.
+            <p className="text-xs text-slate-400 leading-relaxed font-sans">
+              Retro arcade football tournament management platform.
             </p>
           </div>
 
           {/* Clubs */}
           <div>
-            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 mb-2">
+            <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-200 mb-2">
               Tournament Clubs
             </h4>
-            <ul className="space-y-1.5 text-xs">
+            <ul className="space-y-1.5 text-xs font-mono">
               {DEMO_TEAMS.map(team => (
                 <li key={team.id}>
                   <button
                     onClick={() => onNavigate('team-detail', team.id)}
-                    className="hover:text-emerald-700 text-left flex items-center justify-between w-full group py-0.5 cursor-pointer transition-colors"
+                    className="hover:text-lime-400 text-left flex items-center justify-between w-full group py-0.5 cursor-pointer transition-colors"
                   >
-                    <span className="font-medium text-slate-700 group-hover:text-emerald-700">
+                    <span className="font-medium text-slate-300 group-hover:text-lime-400">
                       {team.name}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       {team.manager_name}
                     </span>
                   </button>
@@ -56,36 +56,36 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
           {/* Quick Shortcuts */}
           <div>
-            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-900 mb-2">
+            <h4 className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-200 mb-2">
               Navigation
             </h4>
-            <div className="flex flex-col space-y-1.5 text-xs">
+            <div className="flex flex-col space-y-1.5 text-xs font-mono">
               <button
                 onClick={() => onNavigate('matches')}
-                className="text-left text-slate-700 hover:text-emerald-700 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
+                className="text-left text-slate-300 hover:text-lime-400 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
               >
-                <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                <Calendar className="w-3.5 h-3.5 text-lime-500" />
                 <span>Fixtures & Results</span>
               </button>
               <button
                 onClick={() => onNavigate('teams')}
-                className="text-left text-slate-700 hover:text-emerald-700 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
+                className="text-left text-slate-300 hover:text-lime-400 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
               >
-                <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                <Shield className="w-3.5 h-3.5 text-lime-500" />
                 <span>Participating Squads</span>
               </button>
               <button
                 onClick={() => onNavigate('stats')}
-                className="text-left text-slate-700 hover:text-emerald-700 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
+                className="text-left text-slate-300 hover:text-lime-400 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
               >
-                <Trophy className="w-3.5 h-3.5 text-emerald-600" />
+                <Trophy className="w-3.5 h-3.5 text-lime-500" />
                 <span>Standings & Stats</span>
               </button>
               <button
                 onClick={() => onNavigate('workspace')}
-                className="text-left text-slate-500 hover:text-slate-900 flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
+                className="text-left text-slate-400 hover:text-white flex items-center gap-2 cursor-pointer py-0.5 transition-colors"
               >
-                <Users className="w-3.5 h-3.5" />
+                <Users className="w-3.5 h-3.5 text-slate-400" />
                 <span>Organizer Workspace</span>
               </button>
             </div>
@@ -93,8 +93,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
         </div>
 
-        <div className="mt-8 pt-4 border-t border-slate-200 text-center text-xs text-slate-400">
-          TournX • think.prompt.organise • Football Tournament Platform
+        <div className="mt-8 pt-4 border-t border-[#1f2e26] text-center text-xs font-mono text-slate-500">
+          TournX • think.prompt.organise • Retro Football Management
         </div>
       </div>
     </footer>

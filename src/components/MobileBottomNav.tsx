@@ -26,7 +26,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 border-t border-slate-200 backdrop-blur-md px-2 py-1 safe-bottom shadow-lg">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c120e]/95 border-t border-[#1f2e26] backdrop-blur-md px-2 py-1 safe-bottom shadow-2xl">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {tabs.map(tab => {
           const Icon = tab.icon;
@@ -37,11 +37,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <button
                 key={tab.id}
                 onClick={onOpenLiveWindow}
-                className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 text-rose-600 active:scale-95 transition-transform cursor-pointer"
+                className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 text-rose-400 active:scale-95 transition-transform cursor-pointer"
                 title="Open Live Match Window"
               >
                 <Icon className="w-4 h-4 animate-pulse" />
-                <span className="text-[10px] font-bold mt-0.5 tracking-tight">
+                <span className="text-[10px] font-mono font-bold mt-0.5 tracking-tight">
                   {tab.label}
                 </span>
               </button>
@@ -54,12 +54,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               onClick={() => onNavigate(tab.id)}
               className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 transition-colors cursor-pointer ${
                 isActive
-                  ? 'text-emerald-700 font-bold'
-                  : 'text-slate-500 hover:text-slate-900 font-medium'
+                  ? 'text-lime-400 font-bold'
+                  : 'text-slate-400 hover:text-white font-medium'
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="text-[10px] mt-0.5 tracking-tight">
+              <span className="text-[10px] font-mono mt-0.5 tracking-tight">
                 {tab.label}
               </span>
             </button>

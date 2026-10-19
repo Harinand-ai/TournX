@@ -60,20 +60,21 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col max-h-[92vh] overflow-y-auto text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-[#0f1411] border border-[#1f2e26] rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-y-auto text-[#f1f5f9]">
         
         {/* Title Bar */}
-        <div className="flex items-center justify-between px-5 py-4 bg-slate-50 border-b border-slate-200">
+        <div className="flex items-center justify-between px-5 py-4 bg-[#141d18] border-b border-[#1f2e26]">
           <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-sm font-bold uppercase text-slate-900 tracking-wide">
+            <Trophy className="w-4 h-4 text-lime-400" />
+            <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-lime-400">
               Create New Tournament
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a261f] transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -82,14 +83,14 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div className="p-3 bg-rose-950/60 border border-rose-800 text-rose-300 rounded-xl text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+            <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1">
               Tournament Name *
             </label>
             <input
@@ -98,10 +99,10 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
               placeholder="e.g. Summer Premier League"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 rounded-xl focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+              className="w-full bg-[#0b100d] border border-[#23352a] px-3.5 py-2.5 text-xs text-[#f1f5f9] placeholder-slate-600 rounded-xl focus:border-lime-500 focus:outline-none font-sans"
             />
             {name.trim() && (
-              <span className="text-[11px] text-slate-500 font-mono mt-1 block">
+              <span className="text-[11px] text-lime-400 font-mono mt-1 block">
                 URL Slug: /t/{slugify(name)}
               </span>
             )}
@@ -109,99 +110,102 @@ export const CreateTournamentModal: React.FC<CreateTournamentModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Season / Edition
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1">
+                Season / Year
               </label>
               <input
                 type="text"
                 placeholder="2026"
                 value={season}
                 onChange={e => setSeason(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 rounded-xl focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                className="w-full bg-[#0b100d] border border-[#23352a] px-3.5 py-2.5 text-xs text-[#f1f5f9] placeholder-slate-600 rounded-xl focus:border-lime-500 focus:outline-none font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                Format
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1">
+                Competition Format
               </label>
               <select
                 value={format}
                 onChange={e => setFormat(e.target.value as StageType)}
-                className="w-full bg-slate-50 border border-slate-300 px-3.5 py-2 text-sm text-slate-900 rounded-xl focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 cursor-pointer"
+                className="w-full bg-[#0b100d] border border-[#23352a] px-3 py-2.5 text-xs text-[#f1f5f9] rounded-xl focus:border-lime-500 focus:outline-none font-mono cursor-pointer"
               >
-                <option value="SINGLE_ROUND_ROBIN">Single Round-Robin</option>
-                <option value="DOUBLE_ROUND_ROBIN">Double Round-Robin</option>
-                <option value="SINGLE_ELIMINATION">Knockout (Bracket)</option>
+                <option value="SINGLE_ROUND_ROBIN">Single Round-Robin (All-play-all)</option>
+                <option value="DOUBLE_ROUND_ROBIN">Double Round-Robin (Home & Away)</option>
+                <option value="SINGLE_ELIMINATION">Knockout (Single Elimination)</option>
+                <option value="LEAGUE_WITH_PLAYOFFS">League + Semifinals Playoff</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+            <label className="block text-xs font-mono font-bold uppercase tracking-wider text-slate-300 mb-1">
               Description (Optional)
             </label>
             <textarea
               rows={2}
-              placeholder="Brief overview or organizer notes"
+              placeholder="e.g. 5-a-side college invitational tournament"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 rounded-xl focus:bg-white focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 resize-none"
+              className="w-full bg-[#0b100d] border border-[#23352a] px-3.5 py-2 text-xs text-[#f1f5f9] placeholder-slate-600 rounded-xl focus:border-lime-500 focus:outline-none font-sans resize-none"
             />
           </div>
 
-          {/* Scoring Rules Section */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 uppercase mb-2.5">
-              <Settings2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Standings Points Rules</span>
-            </div>
+          {/* Points Rules */}
+          <div className="p-3.5 bg-[#0b100d] border border-[#23352a] rounded-xl space-y-2">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
+              Scoring Points Configuration
+            </span>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Win Pts</label>
+                <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Win Pts</label>
                 <input
                   type="number"
                   min="0"
+                  max="10"
                   value={ptsWin}
-                  onChange={e => setPtsWin(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-300 px-2 py-1 text-xs text-slate-900 rounded-lg text-center font-bold"
+                  onChange={e => setPtsWin(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-[#131b16] border border-[#25392d] text-center text-xs font-mono font-bold text-lime-400 py-1.5 rounded-lg focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Draw Pts</label>
+                <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Draw Pts</label>
                 <input
                   type="number"
                   min="0"
+                  max="10"
                   value={ptsDraw}
-                  onChange={e => setPtsDraw(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-300 px-2 py-1 text-xs text-slate-900 rounded-lg text-center font-bold"
+                  onChange={e => setPtsDraw(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-[#131b16] border border-[#25392d] text-center text-xs font-mono font-bold text-lime-400 py-1.5 rounded-lg focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">Loss Pts</label>
+                <label className="block text-[10px] font-mono text-slate-400 mb-0.5">Loss Pts</label>
                 <input
                   type="number"
                   min="0"
+                  max="10"
                   value={ptsLoss}
-                  onChange={e => setPtsLoss(Number(e.target.value))}
-                  className="w-full bg-white border border-slate-300 px-2 py-1 text-xs text-slate-900 rounded-lg text-center font-bold"
+                  onChange={e => setPtsLoss(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-[#131b16] border border-[#25392d] text-center text-xs font-mono font-bold text-lime-400 py-1.5 rounded-lg focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2.5">
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1f2e26]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl transition cursor-pointer"
+              className="px-4 py-2 border border-[#273a2f] hover:bg-[#141d18] text-xs font-mono font-semibold text-slate-300 rounded-xl transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={submitting}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold tracking-wide flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+              disabled={submitting || !name.trim()}
+              className="px-5 py-2 bg-lime-500 hover:bg-lime-400 text-black text-xs font-mono font-extrabold rounded-xl transition cursor-pointer disabled:opacity-50 shadow-md flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
               <span>{submitting ? 'Creating...' : 'Create Tournament'}</span>

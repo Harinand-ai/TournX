@@ -51,6 +51,17 @@ export interface TournamentInvite {
   accepted_at?: string;
 }
 
+export interface TournamentDraftRecord {
+  id: string;
+  name: string;
+  prompt: string;
+  teamsCount: number;
+  format: string;
+  status: 'DRAFT';
+  updated_at: string;
+  draftData?: any;
+}
+
 export const FTM_STORAGE_KEYS = {
   DEV_MODE: 'ftm_dev_mode_active',
   SCHEMA_VERSION: 'ftm_dev_schema_version',
@@ -63,6 +74,7 @@ export const FTM_STORAGE_KEYS = {
   LAST_JOINED_ID: 'ftm_last_joined_tournament_id',
   LAST_JOINED_SLUG: 'ftm_last_joined_tournament_slug',
   PROMPT_DRAFT: 'ftm_master_prompt_draft',
+  DRAFTS_INDEX: 'ftm_tournament_drafts_index',
 } as const;
 
 export const DEMO_TOURNAMENT_ID = 'ftm-demo-tourney-01';
@@ -599,6 +611,42 @@ class LocalDataService {
       this.setActiveTournamentId(nextActive);
     }
     return true;
+  }
+
+  public getDrafts(): TournamentDraftRecord[] {
+    const list = this.getItem<TournamentDraftRecord[]>(FTM_STORAGE_KEYS.DRAFTS_INDEX, []);
+    const legacyPrompt = this.getItem<string | null>(FTM_STORAGE_KEYS.PROMPT_DRAFT, null);
+    if (legacyPrompt && legacyPrompt.trim() && !list.some(d => d.prompt === legacyPrompt)) {
+      list.unshift({
+        id: 'draft-auto-recent',
+        name: 'Auto-Saved Tournament Prompt',
+        prompt: legacyPrompt,
+        teamsCount: 0,
+        format: 'Single Round-Robin',
+        status: 'DRAFT',
+        updated_at: new Date().toISOString(),
+      });
+    }
+    return list;
+  }
+
+  public saveDraft(draft: TournamentDraftRecord): void {
+    const list = this.getDrafts().filter(d => d.id !== draft.id);
+    list.unshift(draft);
+    this.setItem(FTM_STORAGE_KEYS.DRAFTS_INDEX, list);
+    this.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, draft.prompt);
+  }
+
+  public deleteDraft(draftId: string): void {
+    const list = this.getDrafts().filter(d => d.id !== draftId);
+    this.setItem(FTM_STORAGE_KEYS.DRAFTS_INDEX, list);
+    const legacyPrompt = this.getItem<string | null>(FTM_STORAGE_KEYS.PROMPT_DRAFT, null);
+    if (draftId === 'draft-auto-recent' || (legacyPrompt && list.length === 0)) {
+      try {
+        const storage = this.getStorage();
+        storage.removeItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
+      } catch {}
+    }
   }
 
   public seedDefaultDemoAccessCodes(): AccessCode[] {

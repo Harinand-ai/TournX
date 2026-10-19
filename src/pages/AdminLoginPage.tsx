@@ -158,18 +158,21 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       {/* Header */}
       <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-xl bg-[#141e17] border border-[#273d2f] mx-auto flex items-center justify-center text-lime-400 mb-3 shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-[#141e17] border border-lime-700/60 mx-auto flex items-center justify-center text-lime-400 mb-2.5 shadow-[0_0_15px_rgba(132,204,22,0.2)]">
           <Shield className="w-6 h-6 text-lime-400" />
         </div>
+        <div className="text-[10px] font-pixel text-lime-400 uppercase tracking-widest mb-1">
+          TOURNX TERMINAL
+        </div>
         <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-[#f1f5f9] font-mono">
-          MANAGER TERMINAL
+          ORGANIZER AUTHENTICATION
         </h1>
         <p className="text-xs text-slate-400 mt-1 font-sans">
           {isSupabaseConfigured
-            ? 'Supabase Authentication • TournX'
+            ? 'Sign in to access tournament drafts, fixtures & settings'
             : import.meta.env.DEV
-            ? 'Local Synthetic Mode • TournX'
-            : 'Organizer Authentication • TournX'}
+            ? 'Local Development Testing Terminal'
+            : 'Organizer Account Sign-In'}
         </p>
       </div>
 

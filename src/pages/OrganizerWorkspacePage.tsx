@@ -21,16 +21,19 @@ import {
   Sliders,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { Tournament } from '../types/multiTenant';
 import { Team, Match, Player, Goal, ManOfTheMatch } from '../types/tournament';
 import { tournamentService } from '../services/tournamentService';
-import { TournamentInvite, localDataService, DEMO_TOURNAMENT_ID } from '../services/localDataService';
+import { TournamentInvite, localDataService, FTM_STORAGE_KEYS } from '../services/localDataService';
 import { parseWorkspaceCommand, ProposedWorkspaceAction } from '../utils/promptParsers';
 import { BulkMediaUploadModal } from '../components/admin/BulkMediaUploadModal';
 import { MatchScoreEditorModal } from '../components/match/MatchScoreEditorModal';
 import { StatsAndLeadersView } from '../components/stats/StatsAndLeadersView';
+
+import { DraftsModal } from '../components/admin/DraftsModal';
 
 interface OrganizerWorkspacePageProps {
   tournament: Tournament;
@@ -40,6 +43,7 @@ interface OrganizerWorkspacePageProps {
   standings: any[];
   onDataChanged: () => void;
   onNavigateHome: () => void;
+  onNavigateToCreate?: (prompt?: string) => void;
   onTournamentDeleted?: (nextTournamentId: string) => void;
   onLogout: () => void;
 }
@@ -54,6 +58,7 @@ export function OrganizerWorkspacePage({
   standings,
   onDataChanged,
   onNavigateHome,
+  onNavigateToCreate,
   onTournamentDeleted,
   onLogout
 }: OrganizerWorkspacePageProps) {
@@ -103,6 +108,61 @@ export function OrganizerWorkspacePage({
   const [isDeletingTournament, setIsDeletingTournament] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Master Prompt Tournament Creator (Central Visual Centerpiece)
+  const [masterPromptText, setMasterPromptText] = useState(() => {
+    try {
+      return localStorage.getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT) || '';
+    } catch {
+      return '';
+    }
+  });
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+  const [draftsCount, setDraftsCount] = useState<number>(() => {
+    try {
+      return tournamentService.getDrafts().length;
+    } catch {
+      return 0;
+    }
+  });
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+
+  const refreshDraftsCount = () => {
+    try {
+      setDraftsCount(tournamentService.getDrafts().length);
+    } catch {}
+  };
+
+  const handleLaunchMasterPrompt = () => {
+    if (!masterPromptText.trim()) return;
+    try {
+      localStorage.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, masterPromptText.trim());
+    } catch {}
+    if (onNavigateToCreate) {
+      onNavigateToCreate(masterPromptText.trim());
+    }
+  };
+
+  const handleSavePromptDraft = () => {
+    if (!masterPromptText.trim()) return;
+    try {
+      const now = new Date().toISOString();
+      tournamentService.saveDraft({
+        id: `draft-${Date.now()}`,
+        name: masterPromptText.slice(0, 32).trim() + (masterPromptText.length > 32 ? '...' : ''),
+        prompt: masterPromptText.trim(),
+        teamsCount: 0,
+        format: 'Single Round-Robin',
+        status: 'DRAFT',
+        updated_at: now,
+      });
+      refreshDraftsCount();
+      setDraftNotice('Draft saved to vault.');
+      setTimeout(() => setDraftNotice(null), 3000);
+    } catch {
+      setDraftNotice('Failed to save draft.');
+    }
+  };
 
   // Editable Settings state
   const [settingsName, setSettingsName] = useState(tournament.name || '');
@@ -448,6 +508,102 @@ export function OrganizerWorkspacePage({
             {copiedLink ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-400" />}
             <span>{copiedLink ? 'Link Copied!' : 'Share Public Link'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Visual Centerpiece: Master Tournament Prompt Creator */}
+      <div className="relative p-6 sm:p-8 rounded-2xl bg-[#0f1411] border border-[#23352a] shadow-2xl overflow-hidden">
+        {/* Subtle retro glowing ambient gradient */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-lime-500/5 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 max-w-3xl mx-auto space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141d18] border border-lime-700/50 text-lime-400 text-[11px] font-pixel tracking-widest uppercase w-fit">
+              <Sparkles className="w-3.5 h-3.5 text-lime-400" />
+              <span>Master Tournament Engine</span>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setIsDraftsModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-[#141d18] hover:bg-[#19241e] border border-[#23352a] text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer w-fit"
+            >
+              <FileText className="w-3.5 h-3.5 text-lime-400" />
+              <span>Drafts Vault</span>
+              {draftsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-lime-500/20 text-lime-400 text-[10px] font-bold">
+                  {draftsCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-[#f1f5f9] font-mono tracking-tight">
+              Describe your tournament. Generate it. Review it. Confirm it.
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 font-sans">
+              Type your tournament setup in natural English. Generate brackets, round-robin fixtures, squad rosters, and tie-breakers instantly.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <textarea
+              value={masterPromptText}
+              onChange={(e) => setMasterPromptText(e.target.value)}
+              placeholder="e.g. Create an 8-team tournament with Arsenal, Chelsea, Liverpool, Spurs, Man City, Man United, Everton and Aston Villa at college ground tomorrow 5 pm"
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-[#0b100d] border border-[#23352a] text-[#f1f5f9] text-sm focus:outline-none focus:border-lime-500 focus:ring-1 focus:ring-lime-500 font-sans placeholder:text-slate-600 transition shadow-inner resize-none"
+            />
+
+            {/* Example chips */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-500">Quick prompts:</span>
+              {[
+                'Arsenal, Chelsea, Liverpool and Spurs league tomorrow 4pm',
+                '8-team knockout college cup at 5pm',
+                'Red, Blue, Green, Yellow round-robin 7-a-side'
+              ].map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  onClick={() => setMasterPromptText(ex)}
+                  className="px-2.5 py-1 rounded-lg bg-[#141d18] hover:bg-[#1a261f] border border-[#23352a] text-slate-300 hover:text-lime-300 text-[11px] font-mono transition cursor-pointer"
+                >
+                  "{ex}"
+                </button>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleSavePromptDraft}
+                disabled={!masterPromptText.trim()}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#141d18] hover:bg-[#19241e] border border-[#23352a] text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+              >
+                <Save className="w-3.5 h-3.5 text-slate-400" />
+                <span>Save Prompt as Draft</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLaunchMasterPrompt}
+                disabled={!masterPromptText.trim()}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-extrabold text-sm shadow-[0_0_20px_rgba(132,204,22,0.35)] transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 font-mono group"
+              >
+                <span>Generate Preview</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
+            </div>
+
+            {draftNotice && (
+              <p className="text-xs text-lime-400 font-mono text-center pt-1 animate-pulse">
+                {draftNotice}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1495,6 +1651,21 @@ export function OrganizerWorkspacePage({
           setIsMediaModalOpen(false);
           onDataChanged();
         }}
+      />
+
+      {/* DRAFTS VAULT MODAL */}
+      <DraftsModal
+        isOpen={isDraftsModalOpen}
+        onClose={() => setIsDraftsModalOpen(false)}
+        onSelectDraft={(draft) => {
+          if (draft.prompt) {
+            setMasterPromptText(draft.prompt);
+          }
+          if (onNavigateToCreate) {
+            onNavigateToCreate(draft.prompt);
+          }
+        }}
+        onDraftsChanged={refreshDraftsCount}
       />
 
     </div>

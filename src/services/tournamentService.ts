@@ -1162,6 +1162,19 @@ class TournamentService {
   resetToOfficialFixtures(): void {
     localDataService.resetDemoData();
   }
+
+  // ================= TOURNAMENT DRAFTS =================
+  getDrafts() {
+    return localDataService.getDrafts();
+  }
+
+  saveDraft(draft: any) {
+    return localDataService.saveDraft(draft);
+  }
+
+  deleteDraft(draftId: string) {
+    return localDataService.deleteDraft(draftId);
+  }
 }
 
 export const tournamentService = new TournamentService();
