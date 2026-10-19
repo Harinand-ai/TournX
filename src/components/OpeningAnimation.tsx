@@ -75,7 +75,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
           key="ftm-arcade-intro"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.35, ease: 'easeInOut' } }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#070a08] text-[#f1f5f9] overflow-hidden select-none"
+          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#070a08] text-[#f1f5f9] overflow-hidden select-none"
         >
           {/* CRT Scanline & Grid Background */}
           <div className="absolute inset-0 pointer-events-none retro-scanlines opacity-40" />

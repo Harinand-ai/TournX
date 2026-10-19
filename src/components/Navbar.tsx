@@ -17,6 +17,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onNavigate,
+  onReplayIntro,
   activeTournamentName,
   isAdminLoggedIn,
   onOpenTournamentSwitcher,
@@ -37,8 +38,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           
           {/* Tournament Brand Logo */}
           <button
-            onClick={() => onNavigate('landing')}
+            onClick={() => {
+              if (onReplayIntro) {
+                onReplayIntro();
+              } else {
+                onNavigate('landing');
+              }
+            }}
             className="flex items-center gap-2.5 text-left focus:outline-none group cursor-pointer"
+            title="Click to replay TournX intro animation"
           >
             <div className="w-8 h-8 rounded-xl bg-[#141e17] border border-[#273d2f] flex items-center justify-center text-lime-400 shadow-sm group-hover:scale-105 transition">
               <Trophy className="w-4 h-4 text-lime-400" />

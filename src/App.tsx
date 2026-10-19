@@ -150,11 +150,12 @@ export function App() {
   });
 
 
-  // Intro state: Only show if explicitly requested in URL parameter (?intro=true)
+  // Intro state: Show arcade opening animation on launch (unless suppressed with ?intro=false)
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('intro') === 'true';
+    if (urlParams.get('intro') === 'false') return false;
+    return true;
   });
 
   // Wizard initial data passed from organizer sign up or workspace prompt
@@ -400,18 +401,11 @@ export function App() {
   const handleIntroComplete = () => {
     setShowIntro(false);
     try {
-      sessionStorage.setItem('ftm_dev_intro_played_session', 'true');
+      sessionStorage.setItem('ftm_intro_seen_session', 'true');
     } catch {}
-    const route = parseCurrentRoute();
-    if (route.tab !== 'admin' && route.tab !== 'admin-login') {
-      handleNavigate('home');
-    }
   };
 
   const handleReplayIntro = () => {
-    try {
-      sessionStorage.removeItem('ftm_dev_intro_played_session');
-    } catch {}
     setShowIntro(true);
   };
 
