@@ -293,8 +293,11 @@ export const FOOTBALL_CLUB_ALIASES: Record<string, string> = {
 export function cleanTeamToken(raw: string): string {
   let cleaned = raw.trim()
     .replace(/^["']|["']$/g, '')
-    .replace(/^[•*\-\d.]+\s*/, '')
+    .replace(/^[•*\-–—]\s*/, '')
+    .replace(/^\(?\d+[.)\]]\s+/, '')
     .replace(/^(?:the\s+)/i, '')
+    .replace(/^(?:(?:make|arrange|create|organize|organise|start)\s+(?:a\s+)?)?(?:football\s+)?(?:tournament|league|cup|bracket|event|competition)\s+(?:for|with|between)\s+/i, '')
+    .replace(/^(?:teams?|clubs?|squads?|participants?)(?:\s+(?:are|include)\b|\s*:)\s*/i, '')
     .trim();
 
   // Strip trailing instructions or schedule details attached without punctuation:
@@ -381,14 +384,21 @@ export function extractFixturePairTeams(text: string): string[] {
   while ((m = pairRegex.exec(text)) !== null) {
     const t1 = cleanTeamToken(m[1]);
     const t2 = cleanTeamToken(m[2]);
-    if (t1 && !teams.includes(t1)) teams.push(t1);
-    if (t2 && !teams.includes(t2)) teams.push(t2);
+    if (t1 && !teams.some(existing => existing.toLowerCase() === t1.toLowerCase())) teams.push(t1);
+    if (t2 && !teams.some(existing => existing.toLowerCase() === t2.toLowerCase())) teams.push(t2);
   }
   return teams.length >= 2 ? teams : [];
 }
 
 export function normalizeTeamName(raw: string): string {
-  const cleaned = raw.trim().replace(/^["']|["']$/g, '').replace(/^[•*\-\d.]+\s*/, '').replace(/^(?:the\s+)/i, '').trim();
+  const cleaned = raw.trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^[•*\-–—]\s*/, '')
+    .replace(/^\(?\d+[.)\]]\s+/, '')
+    .replace(/^(?:the\s+)/i, '')
+    .replace(/^(?:(?:make|arrange|create|organize|organise|start)\s+(?:a\s+)?)?(?:football\s+)?(?:tournament|league|cup|bracket|event|competition)\s+(?:for|with|between)\s+/i, '')
+    .replace(/^(?:teams?|clubs?|squads?|participants?)(?:\s+(?:are|include)\b|\s*:)\s*/i, '')
+    .trim();
   const lower = cleaned.toLowerCase();
   if (FOOTBALL_CLUB_ALIASES[lower]) {
     return FOOTBALL_CLUB_ALIASES[lower];
@@ -585,6 +595,70 @@ function cleanText(text: string): string {
   return text.replace(/\r\n/g, '\n').replace(/\t/g, ' ').trim();
 }
 
+export function isGenericTournamentTitle(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t || t.length < 2) return true;
+  if (/^(?:(?:make|arrange|create|organize|organising|organizing|organise|start|build|set\s*up)\s+)?(?:(?:a|an|the)\s+)?(?:(?:local|new|small|friendly|quick|five[- ]a[- ]side|5[- ]a[- ]side|seven[- ]a[- ]side|7[- ]a[- ]side|5v5|7v7|knockout|round[- ]robin|weekend|annual)\s+)*(?:football\s+|soccer\s+|futsal\s+)?(?:tournament|league|cup|championship|event|competition|bracket|fixtures?|matches?)$/i.test(t)) {
+    return true;
+  }
+  if (/^(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?$/i.test(t)) {
+    return true;
+  }
+  if (/^(?:these\s+teams?|team\s+names?|teams?|participants?|clubs?)$/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+export function isValidTeamCandidate(raw: string): boolean {
+  if (!raw) return false;
+  const token = raw.trim();
+  if (token.length < 1 || token.length > 45) return false;
+
+  // Single letter (A, B, C) or alphanumeric suffix (6s, 7s, 11s)
+  if (/^[a-zA-Z]$/.test(token) || /^\d+[a-zA-Z]{1,3}$/.test(token)) {
+    return true;
+  }
+
+  const lower = token.toLowerCase();
+
+  const forbiddenPatterns = [
+    /\b(?:minutes?|mins?|seconds?|secs?|hours?|hrs?)\b/,
+    /\b(?:halves|half|halftime|half-time|break|interval)\b/,
+    /\b(?:points?|pts?|draws?|wins?|losses|loss)\b/,
+    /\b(?:lasts?|lasting|duration|per\s+half|each\s+half)\b/,
+    /\b(?:advance|advances|advancing|qualify|qualifies|qualifying)\b/,
+    /\b(?:kickoff|kick-off|starting\s+at|starts?\s+at|play\s+at|held\s+at)\b/,
+    /\b(?:substitutes?|subs?|substitutions?)\b/,
+    /\b(?:everyone|everybody|each|every|both|neither|either|please|note|remember)\b/,
+    /\b(?:round[- ]robin|single\s+elimination|double\s+elimination|knockout\s+stage|group\s+stage)\b/,
+    /\b(?:yellow\s+cards?|red\s+cards?|penalties|penalty|extra\s+time)\b/,
+    /\b(?:stadium|ground|turf|arena|pitch|field)\b/,
+    /\b(?:tomorrow|yesterday|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
+    /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/,
+    /\b(?:players?|roster|squad|captain|coach|manager)\b/,
+    /^\d{1,2}(?::\d{2})?\s*(?:am|pm)$/i,
+  ];
+
+  for (const fp of forbiddenPatterns) {
+    if (fp.test(lower)) return false;
+  }
+
+  const words = token.split(/\s+/);
+  if (words.length > 5) return false;
+
+  return true;
+}
+
+export function toSingleLineText(text: string): string {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => (/[.,;:!?]$/.test(line) ? line : `${line}.`))
+    .join(' ');
+}
+
 /**
  * Extracts bullet points or numbered list items if present in prompt
  */
@@ -593,7 +667,7 @@ function extractBulletItems(text: string): string[] {
   const items: string[] = [];
   for (const line of lines) {
     const trimmed = line.trim();
-    const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/) || trimmed.match(/^\d+[.)]\s+(.+)$/);
+    const bulletMatch = trimmed.match(/^[-*•–—]\s+(.+)$/) || trimmed.match(/^\(?\d+[.)\]]\s+(.+)$/);
     if (bulletMatch && bulletMatch[1]) {
       const item = bulletMatch[1].trim().replace(/[,;]$/, '');
       if (item.length > 1) {
@@ -605,11 +679,74 @@ function extractBulletItems(text: string): string[] {
 }
 
 /**
+ * Extracts candidate teams from multiline input (bulleted or unbulleted plain lines)
+ */
+export function extractLineOrBulletTeams(rawText: string): string[] {
+  // First check explicit bullets
+  const bulletItems = extractBulletItems(rawText);
+  if (bulletItems.length >= 2) {
+    const teams: string[] = [];
+    bulletItems.forEach(item => {
+      const cleaned = cleanTeamToken(item);
+      if (cleaned.length >= 1 && !teams.some(t => t.toLowerCase() === cleaned.toLowerCase())) {
+        teams.push(cleaned);
+      }
+    });
+    if (teams.length >= 2) return teams;
+  }
+
+  // Next check unbulleted multiline list of candidate teams
+  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length >= 2) {
+    const candidateTeams: string[] = [];
+    for (const line of lines) {
+      if (/^(?:teams?|clubs?|squads?|participants?|team\s+names?)(?:\s*(?:are|include|:|-|—))?$/i.test(line)) {
+        continue;
+      }
+      if (/\b(?:players?|roster|squad)\s*(?:are|include|:|is)\b/i.test(line)) {
+        continue;
+      }
+      if (/^(?:manager|coach|captain|players?|squad|roster)\b/i.test(line)) {
+        continue;
+      }
+      if (/^(?:venue|ground|date|time|tomorrow|yesterday|today|format|rules?|duration|points?|notes?|schedule):/i.test(line)) {
+        continue;
+      }
+      if (/^(?:create|make|arrange|organize|organise|start)\s+(?:a\s+)?(?:football\s+)?(?:tournament|league|cup)/i.test(line)) {
+        continue;
+      }
+      if (line.includes(',') || line.includes(';') || /\band\b/i.test(line)) {
+        const subTokens = line.split(/,|;|\band\b|&/i).map(t => cleanTeamToken(t)).filter(t => t.length >= 1);
+        if (subTokens.length >= 2 && subTokens.every(st => isValidTeamCandidate(st))) {
+          subTokens.forEach(st => {
+            if (!candidateTeams.some(t => t.toLowerCase() === st.toLowerCase())) {
+              candidateTeams.push(st);
+            }
+          });
+          continue;
+        }
+      }
+      const cleaned = cleanTeamToken(line);
+      if (cleaned && isValidTeamCandidate(cleaned)) {
+        if (!candidateTeams.some(t => t.toLowerCase() === cleaned.toLowerCase())) {
+          candidateTeams.push(cleaned);
+        }
+      }
+    }
+    if (candidateTeams.length >= 2) {
+      return candidateTeams;
+    }
+  }
+
+  return [];
+}
+
+/**
  * Parses conversational prompt into structured tournament configuration
  */
 export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft {
   const rawText = cleanText(promptText);
-  const singleLineText = rawText.replace(/\n+/g, ' ');
+  const singleLineText = toSingleLineText(rawText);
   const lower = singleLineText.toLowerCase();
 
   const missingFields: string[] = [];
@@ -677,7 +814,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   if (calledMatch && calledMatch[1]) {
     let cand = calledMatch[1].trim();
     cand = cand.replace(/\s+[-–—].*$/, '').trim();
-    if (cand.length > 2 && !/^(?:six teams|a tournament|the tournament|football)/i.test(cand)) {
+    if (cand.length > 2 && !isGenericTournamentTitle(cand)) {
       name = cand;
     }
   }
@@ -693,7 +830,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
       if (match && match[1]) {
         let candidate = match[1].trim().replace(/\s+(?:with|for|having|featuring|at|on)$/i, '');
         candidate = candidate.replace(/^(?:the\s+)/i, '').trim();
-        if (candidate.length > 2 && !candidate.toLowerCase().startsWith('six teams') && !candidate.toLowerCase().startsWith('a tournament')) {
+        if (candidate.length > 2 && !isGenericTournamentTitle(candidate)) {
           name = candidate;
           break;
         }
@@ -704,8 +841,13 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   if (!name) {
     const titleMatch = singleLineText.match(/(?:(?:The\s+event\s+is\s+called|Organising\s+(?:the\s+)?|Organizing\s+(?:the\s+)?|Create\s+(?:the\s+)?)\s+)?([A-Z][a-zA-Z0-9\s]+(?:Championship|Cup|League|Tournament|Trophy|Shield|Super Cup|Open))/i);
     if (titleMatch) {
-      const cand = titleMatch[1] || titleMatch[0];
-      name = cand.replace(/^(?:the\s+event\s+is\s+called\s+|organising\s+(?:the\s+)?|organizing\s+(?:the\s+)?|create\s+(?:the\s+)?)/i, '').trim();
+      const cand = (titleMatch[1] || titleMatch[0]).replace(/^(?:the\s+event\s+is\s+called\s+|organising\s+(?:the\s+)?|organizing\s+(?:the\s+)?|create\s+(?:the\s+)?)/i, '').trim();
+      if (!isGenericTournamentTitle(cand)) {
+        name = cand;
+      } else {
+        name = 'Draft Tournament';
+        missingFields.push('Tournament name');
+      }
     } else {
       name = 'Draft Tournament';
       missingFields.push('Tournament name');
@@ -721,18 +863,17 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     explicitTeamCount = countMatch[1] ? parseInt(countMatch[1], 10) : parseNumberWordOrDigits(countMatch[2]) || 0;
   }
 
-  // First check bullet items
-  const bulletItems = extractBulletItems(rawText);
-  if (bulletItems.length >= 2) {
-    bulletItems.forEach(item => {
-      const cleaned = cleanTeamToken(item);
-      if (cleaned.length >= 1 && !teams.includes(cleaned)) {
-        teams.push(cleaned);
+  // First check lines or bullet items
+  const lineTeams = extractLineOrBulletTeams(rawText);
+  if (lineTeams.length >= 2) {
+    lineTeams.forEach(item => {
+      if (!teams.some(existing => existing.toLowerCase() === item.toLowerCase())) {
+        teams.push(item);
       }
     });
   }
 
-  // If no bullets, parse conversational sentences
+  // If no lines/bullets, parse conversational sentences
   if (teams.length === 0) {
     const teamSectionPatterns = [
       // Pattern 1: e.g. "teamnames crystal apalce,fulham,dotmund and spurs at college ground..." or "team names are A, B, C and D"
@@ -741,10 +882,10 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
       /(?:(?:(?:have|got)\s+)?(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\s*:\s*)([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
       // Pattern 3: e.g. "create a knockout tournament for these teams: A, B, C, D" or "for these teams: ..."
       /(?:for\s+(?:these|the)?\s*teams?\s*:?\s*)([^.]+?)(?=\s+at|\s+on|\s+starting|\s+starts|[.;!?\n]|$)/i,
-      // Pattern 4: e.g. "make a tournament with Arsenal, Chelsea, Liverpool and Spurs"
-      /(?:(?:make|arrange|create|organize|organise|start)\s+(?:a\s+)?(?:football\s+)?(?:tournament|league|cup)\s+(?:called\s+[^.]+?\s+)?with\s+)(?!(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\b)([^.]+?)(?=\s+at|\s+on|\s+starting|\s+starts|[.;!?\n]|$)/i,
+      // Pattern 4: e.g. "make a tournament with Arsenal, Chelsea, Liverpool and Spurs" or "tournament for/between A, B, C and D"
+      /(?:(?:make|arrange|create|organize|organise|start|build|set\s*up)\s+(?:a\s+)?(?:football\s+)?(?:tournament|league|cup|event|bracket)\s+(?:called\s+[^.]+?\s+)?(?:with|for|between)\s+)(?!(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\b)([^.]+?)(?=\s+at|\s+on|\s+starting|\s+starts|[.;!?\n]|$)/i,
       // Pattern 4b: e.g. "create a double elimination bracket for Red, Blue, Green, Yellow"
-      /(?:(?:bracket|tournament|cup|league)\s+(?:for\s+(?:these\s+)?(?:teams?\s*:?\s*)?|with\s+(?:teams?\s*:?\s*)?))(?!\d+\s+teams?\b)([^.]+?)(?=\s+at|\s+on|[.;!?\n]|$)/i,
+      /(?:(?:bracket|tournament|cup|league)\s+(?:for\s+(?:these\s+)?(?:teams?\s*:?\s*)?|with\s+(?:teams?\s*:?\s*)?|between\s+(?:teams?\s*:?\s*)?))(?!\d+\s+teams?\b)([^.]+?)(?=\s+at|\s+on|[.;!?\n]|$)/i,
       // Pattern 5: Standard conversational sentence e.g. "Six teams are participating: ..." or "teams are: ..." or "teams are a, b, c, d, make tournament"
       /(?:\b(?:teams?|clubs?|squads?|participants?)\b)\s*(?:are\s+participating|participating\s+are|are|include|namely|:|-|—)\s*:?\s*([^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$)|(?:\s+players?\s+(?:are|include|:))|[.;!?\n]|$)/i,
       /(?:we\s+have|featuring)\s+([A-Z][^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$))/i,
@@ -761,13 +902,13 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
             const vsParts = tok.split(/\b(?:vs|v)\b/i);
             for (const vp of vsParts) {
               const cleaned = cleanTeamToken(vp);
-              if (cleaned && !teams.includes(cleaned)) {
+              if (cleaned && !teams.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
                 teams.push(cleaned);
               }
             }
           } else {
             const cleaned = cleanTeamToken(tok);
-            if (cleaned && !teams.includes(cleaned)) {
+            if (cleaned && !teams.some(existing => existing.toLowerCase() === cleaned.toLowerCase())) {
               teams.push(cleaned);
             }
           }
@@ -782,7 +923,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     const pairTeams = extractFixturePairTeams(singleLineText);
     if (pairTeams.length >= 2) {
       pairTeams.forEach(t => {
-        if (!teams.includes(t)) teams.push(t);
+        if (!teams.some(existing => existing.toLowerCase() === t.toLowerCase())) teams.push(t);
       });
     }
   }
@@ -792,20 +933,79 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     const sequentialClubs = extractConsecutiveKnownClubs(singleLineText);
     if (sequentialClubs.length >= 2) {
       sequentialClubs.forEach(t => {
-        if (!teams.includes(t)) teams.push(t);
+        if (!teams.some(existing => existing.toLowerCase() === t.toLowerCase())) teams.push(t);
       });
     }
   }
 
-  // Fallback 3: list of capitalized clubs with typical suffixes
+  // Fallback 3: Delimited list of arbitrary custom team names (comma, semicolon, or "and" separated)
   if (teams.length === 0) {
-    const commaListMatch = singleLineText.match(/([A-Z][A-Za-z0-9\s]+(?:FC|United|City|Rovers|Strikers|Stars|Wanderers|Boys|Warriors|Athletic|Real|Club|Blasters)[^.]+)/);
-    if (commaListMatch) {
-      const items = commaListMatch[1].split(/,|\band\b/i).map(t => t.trim());
-      items.forEach(item => {
-        const norm = cleanTeamToken(item);
-        if (norm && !teams.includes(norm)) teams.push(norm);
-      });
+    const candidateSegments: string[] = [];
+
+    // 1. Portion of text before any venue/date or trailing command
+    const prefixMatch = singleLineText.match(/^([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?]|$)/i);
+    if (prefixMatch && prefixMatch[1]) {
+      candidateSegments.push(prefixMatch[1]);
+    }
+
+    // 2. Portion after a colon (e.g. "Hostel Cup: Sasi, Biju, Mozhappala FC, Karikunnam 6s")
+    const colonMatch = singleLineText.match(/:\s*([^.]+?)(?=\s+at|\s+on|[.;!?]|$)/i);
+    if (colonMatch && colonMatch[1]) {
+      candidateSegments.push(colonMatch[1]);
+    }
+
+    // 3. Fallback to whole singleLineText
+    candidateSegments.push(singleLineText);
+
+    for (const segment of candidateSegments) {
+      if (!segment.includes(',') && !segment.includes(';') && !/\band\b/i.test(segment) && !segment.includes('&')) {
+        continue;
+      }
+      const rawTokens = segment.split(/,|;|\band\b|&/i).map(t => t.trim().replace(/^["']|["']$/g, ''));
+      const parsedTokens: string[] = [];
+      let allValid = true;
+
+      for (const tok of rawTokens) {
+        if (!tok) continue;
+        const isInstruction = /^(?:make|arrange|create|organize|organise|set\s*up|build)\s+(?:a\s+)?(?:football\s+)?(?:tournament|league|cup|fixtures?|matches?|event)?$/i.test(tok.trim()) ||
+                              /^(?:tournament|league|cup|football|soccer|futsal|fixtures?|matches?|event)$/i.test(tok.trim());
+        if (isInstruction) continue;
+
+        if (/\b(?:vs|v)\b/i.test(tok)) {
+          const vsParts = tok.split(/\b(?:vs|v)\b/i);
+          for (const vp of vsParts) {
+            const cleaned = cleanTeamToken(vp);
+            if (cleaned && isValidTeamCandidate(cleaned)) {
+              if (!parsedTokens.some(pt => pt.toLowerCase() === cleaned.toLowerCase())) {
+                parsedTokens.push(cleaned);
+              }
+            } else {
+              allValid = false;
+              break;
+            }
+          }
+        } else {
+          const cleaned = cleanTeamToken(tok);
+          if (cleaned && isValidTeamCandidate(cleaned)) {
+            if (!parsedTokens.some(pt => pt.toLowerCase() === cleaned.toLowerCase())) {
+              parsedTokens.push(cleaned);
+            }
+          } else {
+            allValid = false;
+            break;
+          }
+        }
+        if (!allValid) break;
+      }
+
+      if (allValid && parsedTokens.length >= 2) {
+        parsedTokens.forEach(t => {
+          if (!teams.some(existing => existing.toLowerCase() === t.toLowerCase())) {
+            teams.push(t);
+          }
+        });
+        if (teams.length >= 2) break;
+      }
     }
   }
 
@@ -817,7 +1017,7 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     if (teamNameMatches.length >= 2) {
       teamNameMatches.forEach(m => {
         const fullTeam = `Team ${m[1].trim()}`;
-        if (!teams.includes(fullTeam)) {
+        if (!teams.some(existing => existing.toLowerCase() === fullTeam.toLowerCase())) {
           teams.push(fullTeam);
         }
       });
