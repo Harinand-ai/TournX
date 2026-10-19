@@ -744,8 +744,14 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0d0b] text-[#f1f5f9] font-sans selection:bg-lime-500 selection:text-black retro-dot-grid">
+    <div className="min-h-screen flex flex-col bg-[#0a0d0b] text-[#f1f5f9] font-sans selection:bg-lime-500 selection:text-black retro-dot-grid relative overflow-x-hidden">
       
+      {/* Animated 3D Retro Perspective Grid Background */}
+      <div className="retro-perspective-grid-container" aria-hidden="true">
+        <div className="retro-horizon-glow" />
+        <div className="retro-perspective-grid" />
+      </div>
+
       {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (
         <OpeningAnimation onComplete={handleIntroComplete} />

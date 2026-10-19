@@ -61,6 +61,57 @@
   background-size: 20px 20px;
 }
 
+/* Animated 3D Retro Arcade Perspective Grid */
+.retro-perspective-grid-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48vh;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  perspective: 380px;
+  perspective-origin: 50% 0%;
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.95) 70%, rgba(0, 0, 0, 1) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.95) 70%, rgba(0, 0, 0, 1) 100%);
+}
+
+.retro-perspective-grid {
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background-image: 
+    linear-gradient(to right, rgba(132, 204, 22, 0.3) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(132, 204, 22, 0.3) 1.5px, transparent 1.5px);
+  background-size: 52px 52px;
+  transform: rotateX(72deg);
+  transform-origin: 50% 0%;
+  animation: retroGridScroll 2.2s linear infinite;
+  box-shadow: inset 0 0 50px rgba(132, 204, 22, 0.15);
+}
+
+.retro-horizon-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.7) 50%, transparent 100%);
+  box-shadow: 0 0 25px 3px rgba(132, 204, 22, 0.5);
+}
+
+@keyframes retroGridScroll {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 52px;
+  }
+}
+
 /* Retro Card System */
 .retro-card {
   background-color: #0f1411;
