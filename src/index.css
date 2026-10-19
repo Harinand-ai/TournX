@@ -67,14 +67,14 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 48vh;
+  height: 56vh;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
-  perspective: 380px;
+  perspective: 340px;
   perspective-origin: 50% 0%;
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.95) 70%, rgba(0, 0, 0, 1) 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.95) 70%, rgba(0, 0, 0, 1) 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 20%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 1) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 20%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 1) 100%);
 }
 
 .retro-perspective-grid {
@@ -84,13 +84,14 @@
   width: 200%;
   height: 200%;
   background-image: 
-    linear-gradient(to right, rgba(132, 204, 22, 0.3) 1.5px, transparent 1.5px),
-    linear-gradient(to bottom, rgba(132, 204, 22, 0.3) 1.5px, transparent 1.5px);
-  background-size: 52px 52px;
+    linear-gradient(to right, rgba(132, 204, 22, 0.4) 1.5px, transparent 1.5px),
+    linear-gradient(to bottom, rgba(132, 204, 22, 0.4) 1.5px, transparent 1.5px);
+  background-size: 56px 56px;
   transform: rotateX(72deg);
   transform-origin: 50% 0%;
-  animation: retroGridScroll 2.2s linear infinite;
-  box-shadow: inset 0 0 50px rgba(132, 204, 22, 0.15);
+  animation: retroGridScroll 2s linear infinite;
+  box-shadow: inset 0 0 60px rgba(132, 204, 22, 0.2);
+  filter: drop-shadow(0 0 3px rgba(132, 204, 22, 0.35));
 }
 
 .retro-horizon-glow {
@@ -98,9 +99,9 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.7) 50%, transparent 100%);
-  box-shadow: 0 0 25px 3px rgba(132, 204, 22, 0.5);
+  height: 3px;
+  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.85) 50%, transparent 100%);
+  box-shadow: 0 0 30px 5px rgba(132, 204, 22, 0.6);
 }
 
 @keyframes retroGridScroll {
@@ -108,7 +109,7 @@
     background-position: 0 0;
   }
   100% {
-    background-position: 0 52px;
+    background-position: 0 56px;
   }
 }
 

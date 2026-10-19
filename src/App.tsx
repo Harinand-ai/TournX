@@ -696,10 +696,16 @@ export function App() {
     }
 
     return (
-      <div className="min-h-screen w-full bg-[#0b110e] text-[#f1f5f9] font-sans selection:bg-emerald-900 selection:text-emerald-100 flex flex-col">
+      <div className="min-h-screen w-full bg-[#0b110e] text-[#f1f5f9] font-sans selection:bg-emerald-900 selection:text-emerald-100 flex flex-col relative overflow-x-hidden">
+        {/* Animated 3D Retro Perspective Grid Background */}
+        <div className="retro-perspective-grid-container" aria-hidden="true">
+          <div className="retro-horizon-glow" />
+          <div className="retro-perspective-grid" />
+        </div>
+
         {showIntro && <OpeningAnimation onComplete={handleIntroComplete} />}
         
-        <div className="flex-1 w-full">
+        <div className="flex-1 w-full relative z-10">
           {renderCurrentPage()}
         </div>
 

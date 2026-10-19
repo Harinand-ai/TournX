@@ -1,19 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FastForward, Volume2, VolumeX } from 'lucide-react';
-import { isArcadeAudioEnabled, setArcadeAudioEnabled } from '../utils/arcadeAudio';
+import { FastForward, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { playArcadeBootChime, isArcadeAudioEnabled, setArcadeAudioEnabled } from '../utils/arcadeAudio';
 
 interface OpeningAnimationProps {
   onComplete: () => void;
 }
 
 export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }) => {
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => isArcadeAudioEnabled());
+  // Default audio to ON
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [browserBlockedAudio, setBrowserBlockedAudio] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  
+  const [videoReady, setVideoReady] = useState(false);
+  const [fallbackMode, setFallbackMode] = useState(false);
+  const [nativePhase, setNativePhase] = useState<'pixels' | 'assemble' | 'impact'>('pixels');
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const completedRef = useRef(false);
 
@@ -27,7 +30,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
     setVideoEnded(true);
     setTimeout(() => {
       onComplete();
-    }, 300);
+    }, 350);
   }, [onComplete]);
 
   // Reduced motion detection
@@ -40,19 +43,93 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
       return;
     }
 
-    // Safety timeout: if video fails to report ended after 12s, automatically finish
+    // Safety timeout: if video doesn't end within 11s, finish cleanly
     const safetyTimer = setTimeout(() => {
       handleFinish();
-    }, 12000);
+    }, 11000);
 
-    return () => clearTimeout(safetyTimer);
-  }, [handleFinish, prefersReducedMotion]);
+    // If video takes more than 1.5s to start, seamlessly switch to 60fps native arcade animation
+    const loadTimeout = setTimeout(() => {
+      if (!videoReady) {
+        console.info('Switching to native high-fps retro arcade animation');
+        setFallbackMode(true);
+      }
+    }, 1500);
 
-  // Handle sound toggle
-  const toggleSound = () => {
+    return () => {
+      clearTimeout(safetyTimer);
+      clearTimeout(loadTimeout);
+    };
+  }, [handleFinish, prefersReducedMotion, videoReady]);
+
+  // Try playing with audio on load, with fallback if browser blocks unmuted autoplay
+  useEffect(() => {
+    setArcadeAudioEnabled(true);
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = false;
+    video.volume = 1.0;
+
+    const attemptPlay = async () => {
+      try {
+        await video.play();
+        setBrowserBlockedAudio(false);
+      } catch (err) {
+        // Autoplay policy prevented unmuted playback: play muted temporarily and ask for 1 tap
+        console.warn('Browser required user gesture for audio autoplay, muting initially:', err);
+        video.muted = true;
+        setBrowserBlockedAudio(true);
+        video.play().catch(() => {});
+      }
+    };
+
+    attemptPlay();
+
+    // Listen for any user interaction anywhere on the window to immediately unmute audio
+    const handleUserInteraction = () => {
+      if (videoRef.current) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+        setSoundEnabled(true);
+        setBrowserBlockedAudio(false);
+        setArcadeAudioEnabled(true);
+      }
+    };
+
+    window.addEventListener('pointerdown', handleUserInteraction, { once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, []);
+
+  // Native fallback sequence if video is slow
+  useEffect(() => {
+    if (!fallbackMode) return;
+
+    playArcadeBootChime();
+
+    const tAssemble = setTimeout(() => setNativePhase('assemble'), 400);
+    const tImpact = setTimeout(() => setNativePhase('impact'), 1300);
+    const tEnd = setTimeout(() => handleFinish(), 2400);
+
+    return () => {
+      clearTimeout(tAssemble);
+      clearTimeout(tImpact);
+      clearTimeout(tEnd);
+    };
+  }, [fallbackMode, handleFinish]);
+
+  const toggleSound = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const next = !soundEnabled;
     setSoundEnabled(next);
     setArcadeAudioEnabled(next);
+    setBrowserBlockedAudio(false);
     if (videoRef.current) {
       videoRef.current.muted = !next;
       if (next) {
@@ -64,123 +141,201 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
 
   const handleTimeUpdate = () => {
     if (videoRef.current && videoRef.current.duration) {
-      const pct = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      const current = videoRef.current.currentTime;
+      const total = videoRef.current.duration;
+      const pct = (current / total) * 100;
       setVideoProgress(Math.min(100, Math.max(0, pct)));
+
+      // If near end (within 0.25s), begin seamless exit so it never hangs or lags
+      if (current >= total - 0.25) {
+        handleFinish();
+      }
     }
   };
 
   const handleVideoCanPlay = () => {
-    setHasStarted(true);
-    if (videoRef.current) {
-      videoRef.current.muted = !soundEnabled;
-      videoRef.current.play().catch((err) => {
-        console.warn('Autoplay with sound prevented, muting:', err);
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          setSoundEnabled(false);
-          videoRef.current.play().catch(() => {});
-        }
-      });
-    }
+    setVideoReady(true);
   };
 
   return (
     <AnimatePresence>
       {!videoEnded && (
         <motion.div
-          key="ftm-gemini-video-intro"
+          key="ftm-fullbleed-intro"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.35, ease: 'easeInOut' } }}
-          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#050806] text-[#f1f5f9] overflow-hidden select-none"
+          exit={{ opacity: 0, transition: { duration: 0.4, ease: 'easeOut' } }}
+          className="fixed inset-0 z-[99999] w-full h-full bg-[#050806] text-[#f1f5f9] overflow-hidden select-none"
+          onClick={() => {
+            // Clicking anywhere unmutes if blocked, or can skip if double tapped
+            if (browserBlockedAudio && videoRef.current) {
+              videoRef.current.muted = false;
+              videoRef.current.volume = 1.0;
+              setBrowserBlockedAudio(false);
+              setSoundEnabled(true);
+            }
+          }}
         >
-          {/* CRT Scanline & Grid Background */}
-          <div className="absolute inset-0 pointer-events-none retro-scanlines opacity-30 z-20" />
-          <div className="absolute inset-0 pointer-events-none retro-dot-grid opacity-20 z-20" />
+          {/* Edge-to-Edge Video Player Integrated Directly in Web Canvas */}
+          {!fallbackMode && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black">
+              <video
+                ref={videoRef}
+                src="/tournx-intro.mp4"
+                preload="auto"
+                autoPlay
+                playsInline
+                muted={!soundEnabled}
+                onCanPlay={handleVideoCanPlay}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={handleFinish}
+                onError={() => {
+                  console.warn('Video error, falling back to native animation');
+                  setFallbackMode(true);
+                }}
+                className="w-full h-full object-cover sm:object-contain pointer-events-none"
+              />
+            </div>
+          )}
 
-          {/* Top Controls: Sound Toggle & Skip */}
-          <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between max-w-4xl mx-auto px-2">
+          {/* High-FPS Native 3D Retro Arcade Animation (Active if fallback triggered or video buffering) */}
+          {(fallbackMode || !videoReady) && (
+            <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-[#070a08] overflow-hidden">
+              {/* 3D Moving Perspective Wireframe Grid */}
+              <div className="retro-perspective-grid-container opacity-90">
+                <div className="retro-horizon-glow" />
+                <div className="retro-perspective-grid" />
+              </div>
+
+              {/* Rising Arcade Pixels */}
+              <div className="relative z-10 w-64 h-32 flex items-center justify-center">
+                {[...Array(24)].map((_, i) => {
+                  const delay = (i % 8) * 0.08;
+                  const posX = ((i % 6) - 2.5) * 36;
+                  const isLime = i % 3 === 0;
+
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 100, x: posX, scale: 0.4 }}
+                      animate={{
+                        opacity: nativePhase === 'impact' ? [0.8, 1, 0] : [0, 0.9, 0.7],
+                        y: nativePhase === 'assemble' || nativePhase === 'impact' ? 0 : 35,
+                        scale: nativePhase === 'impact' ? 1.4 : 1,
+                      }}
+                      transition={{ duration: 0.8, delay, ease: 'easeOut' }}
+                      className={`absolute w-3.5 h-3.5 rounded-[2px] ${
+                        isLime ? 'bg-lime-400 shadow-[0_0_10px_#84cc16]' : 'bg-slate-100 shadow-[0_0_6px_#f1f5f9]'
+                      }`}
+                    />
+                  );
+                })}
+
+                {/* Main Assembled Wordmark */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                  animate={{
+                    opacity: nativePhase === 'assemble' || nativePhase === 'impact' ? 1 : 0,
+                    scale: nativePhase === 'impact' ? [1, 1.06, 1] : 1,
+                    y: 0,
+                  }}
+                  transition={{ duration: 0.35, ease: 'easeOut' }}
+                  className="relative z-10"
+                >
+                  <div className="text-5xl sm:text-6xl font-black font-pixel tracking-wider uppercase text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]">
+                    TOURN<span className="text-lime-400 drop-shadow-[0_0_24px_rgba(132,204,22,0.9)]">X</span>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Terminal Subtitle */}
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{
+                  opacity: nativePhase === 'impact' ? 1 : 0,
+                  y: nativePhase === 'impact' ? 0 : 6,
+                }}
+                className="relative z-10 mt-3 inline-block px-3.5 py-1 rounded-full bg-[#121c15] border border-lime-500/60 text-lime-400 font-mono text-xs font-bold tracking-widest lowercase shadow-[0_0_12px_rgba(132,204,22,0.3)]"
+              >
+                think.prompt.organise
+              </motion.div>
+            </div>
+          )}
+
+          {/* CRT Scanline & Subtle Vignette across Entire Viewport */}
+          <div className="absolute inset-0 pointer-events-none retro-scanlines opacity-25 z-20" />
+          <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(0,0,0,0.85)] z-20" />
+
+          {/* HUD Top Bar: Audio Default ON & Skip Button */}
+          <div className="absolute top-4 sm:top-6 left-4 sm:left-8 right-4 sm:right-8 z-30 flex items-center justify-between">
+            {/* Audio Toggle (Default ON) */}
             <button
               type="button"
               onClick={toggleSound}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0f1411]/90 hover:bg-[#151e18] border border-[#24352b] rounded-lg text-xs font-mono text-slate-300 transition cursor-pointer shadow-lg backdrop-blur-xs"
-              title={soundEnabled ? 'Mute arcade sound' : 'Enable arcade sound'}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono transition cursor-pointer shadow-lg backdrop-blur-md ${
+                soundEnabled
+                  ? 'bg-[#121c15]/90 border border-lime-500/70 text-lime-400 shadow-[0_0_12px_rgba(132,204,22,0.25)]'
+                  : 'bg-[#0f1411]/90 border border-[#24352b] text-slate-400'
+              }`}
+              title={soundEnabled ? 'Arcade Audio is ON (Click to mute)' : 'Arcade Audio is Muted (Click to enable)'}
             >
               {soundEnabled ? (
                 <>
-                  <Volume2 className="w-3.5 h-3.5 text-lime-400" />
-                  <span className="text-[11px] text-lime-400 font-bold">Sound ON</span>
+                  <Volume2 className="w-3.5 h-3.5 text-lime-400 animate-pulse" />
+                  <span className="font-bold tracking-wider">AUDIO ON</span>
                 </>
               ) : (
                 <>
                   <VolumeX className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-[11px] text-slate-400">Unmute Sound</span>
+                  <span className="tracking-wider">MUTED</span>
                 </>
               )}
             </button>
 
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#0f1411]/80 border border-[#24352b] rounded-full text-[11px] font-mono text-lime-400/80">
-              <span className="inline-block w-2 h-2 rounded-full bg-lime-400 animate-pulse" />
-              <span>TOURNX // INTRO SEQUENCE</span>
-            </div>
+            {/* Click Anywhere to Unmute Hint (Only shown if browser blocked unmuted autoplay) */}
+            {browserBlockedAudio && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-lime-950/80 border border-lime-500/60 rounded-full text-[11px] font-mono text-lime-300 animate-pulse cursor-pointer"
+                onClick={() => {
+                  if (videoRef.current) {
+                    videoRef.current.muted = false;
+                    videoRef.current.volume = 1.0;
+                    setBrowserBlockedAudio(false);
+                    setSoundEnabled(true);
+                  }
+                }}
+              >
+                <Sparkles className="w-3 h-3 text-lime-400" />
+                <span>TAP ANYWHERE FOR SOUND</span>
+              </motion.div>
+            )}
 
+            {/* SKIP Button */}
             <button
               type="button"
-              onClick={handleFinish}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#0f1411]/90 hover:bg-[#151e18] border border-[#24352b] hover:border-lime-500/60 rounded-lg text-xs font-mono text-slate-300 hover:text-white transition cursor-pointer shadow-lg backdrop-blur-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFinish();
+              }}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#0f1411]/90 hover:bg-[#151e18] border border-[#24352b] hover:border-lime-500/60 rounded-lg text-xs font-mono text-slate-200 hover:text-white transition cursor-pointer shadow-lg backdrop-blur-md"
             >
-              <span className="text-[11px] font-bold">SKIP</span>
+              <span className="font-bold tracking-wider">SKIP</span>
               <FastForward className="w-3.5 h-3.5 text-lime-400" />
             </button>
           </div>
 
-          {/* Center Video Container */}
-          <div className="relative z-10 w-full max-w-4xl h-full max-h-[85vh] flex items-center justify-center p-2 sm:p-6">
-            {!videoError ? (
-              <div className="relative w-full h-full flex items-center justify-center rounded-2xl overflow-hidden border border-lime-900/40 shadow-[0_0_50px_rgba(34,197,94,0.15)] bg-black">
-                <video
-                  ref={videoRef}
-                  src="/tournx-intro.mp4"
-                  autoPlay
-                  playsInline
-                  muted={!soundEnabled}
-                  onCanPlay={handleVideoCanPlay}
-                  onTimeUpdate={handleTimeUpdate}
-                  onEnded={handleFinish}
-                  onError={() => {
-                    console.warn('Video failed to load, falling back...');
-                    setVideoError(true);
-                    setTimeout(handleFinish, 2000);
-                  }}
-                  className="w-full h-full object-contain max-h-[80vh]"
-                />
-
-                {/* Subtle edge vignette */}
-                <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_60px_rgba(0,0,0,0.8)]" />
-              </div>
-            ) : (
-              /* Fallback in case video format is unsupported on client */
-              <div className="flex flex-col items-center justify-center text-center p-8">
-                <div className="text-4xl font-black font-pixel tracking-wider uppercase text-white mb-3">
-                  TOURN<span className="text-lime-400">X</span>
-                </div>
-                <div className="text-xs font-mono text-lime-400 tracking-widest uppercase">
-                  think.prompt.organise
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom Loading / Progress Bar */}
-          <div className="absolute bottom-5 left-0 right-0 max-w-md mx-auto px-6 z-30">
-            <div className="w-full bg-[#141d18]/90 border border-[#233529] h-2 rounded-full overflow-hidden p-0.5 shadow-md">
+          {/* Bottom Sleek Integrated Progress Line */}
+          <div className="absolute bottom-6 left-6 right-6 max-w-lg mx-auto z-30">
+            <div className="w-full bg-[#141d18]/80 border border-[#233529] h-1.5 rounded-full overflow-hidden p-0.25 shadow-md">
               <div
-                style={{ width: `${videoProgress}%` }}
-                className="h-full bg-lime-400 rounded-full shadow-[0_0_10px_#84cc16] transition-all duration-150 ease-out"
+                style={{ width: `${fallbackMode ? 100 : videoProgress}%` }}
+                className="h-full bg-lime-400 rounded-full shadow-[0_0_8px_#84cc16] transition-all duration-150 ease-out"
               />
             </div>
-            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 mt-1.5 px-0.5">
-              <span>INITIALIZING TOURNX OS</span>
-              <span>{Math.round(videoProgress)}%</span>
+            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 mt-1.5 px-1">
+              <span>TOURNX // INITIALIZING</span>
+              <span>{fallbackMode ? '100%' : `${Math.round(videoProgress)}%`}</span>
             </div>
           </div>
         </motion.div>
@@ -188,4 +343,5 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
     </AnimatePresence>
   );
 };
+
 
