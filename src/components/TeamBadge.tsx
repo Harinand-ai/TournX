@@ -2,7 +2,7 @@ import React from 'react';
 import { Team } from '../types/tournament';
 
 interface TeamBadgeProps {
-  team: Team;
+  team?: Team | null;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   showName?: boolean;
   nameClassName?: string;
@@ -31,6 +31,13 @@ export const TeamBadge: React.FC<TeamBadgeProps> = ({
 
   // Specific broadcast crest vector for each of the 6 official tournament teams
   const renderCrestGraphic = () => {
+    if (!team) {
+      return (
+        <div className="w-full h-full rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center font-bold text-slate-500 text-[10px]">
+          TX
+        </div>
+      );
+    }
     switch (team.short_name) {
       case 'CRY': // Crystal Palace: Halved Royal Blue & Garibaldi Red with Gold Eagle
         return (
@@ -160,11 +167,11 @@ export const TeamBadge: React.FC<TeamBadgeProps> = ({
         {glow && (
           <div
             className="absolute inset-0 rounded-full blur-xl opacity-40 scale-125 pointer-events-none"
-            style={{ backgroundColor: team.primary_color }}
+            style={{ backgroundColor: team?.primary_color || '#15803d' }}
           />
         )}
 
-        {team.logo_url ? (
+        {team?.logo_url ? (
           <img
             src={team.logo_url}
             alt={`${team.name} badge`}
@@ -177,7 +184,7 @@ export const TeamBadge: React.FC<TeamBadgeProps> = ({
         )}
       </div>
 
-      {showName && (
+      {showName && team && (
         <span className={nameClassName}>
           {team.name}
         </span>

@@ -38,6 +38,8 @@ import { TournamentSwitcherModal } from './components/TournamentSwitcherModal';
 import { CreateTournamentModal } from './components/CreateTournamentModal';
 import { AccessCodeModal } from './components/AccessCodeModal';
 import { InteractiveTutorialModal } from './components/InteractiveTutorialModal';
+import { PageTransition3D } from './components/PageTransition3D';
+import { ShareTournamentModal } from './components/ShareTournamentModal';
 import { Analytics } from '@vercel/analytics/react';
 import { Trophy, Plus, RefreshCw } from 'lucide-react';
 
@@ -145,6 +147,7 @@ export function App() {
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [isLiveWindowOpen, setIsLiveWindowOpen] = useState(false);
+  const [isGlobalShareOpen, setIsGlobalShareOpen] = useState(false);
 
   // Authorization Role for active tournament ('VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS')
   const [sessionRole, setSessionRole] = useState<'VIEW' | 'SCORE' | 'ORGANIZER' | 'ANONYMOUS'>(() => {
@@ -498,6 +501,7 @@ export function App() {
                 ? 'Your previous tournament has ended or expired. Please join another tournament or create a new one below.'
                 : undefined
             }
+            onOpenTutorial={() => setIsTutorialOpen(true)}
             onOrganizeClick={(initialTourney) => {
               if (initialTourney) {
                 setWizardInitialData(initialTourney);
@@ -506,13 +510,23 @@ export function App() {
                 handleNavigate('workspace');
               }
             }}
-            onJoinTournament={(slug) => {
-              const found = localDataService.getTournamentBySlug(slug);
-              if (found) {
-                localDataService.setLastJoinedTournament(found.id, found.slug || undefined);
-                handleTournamentChanged(found.id);
+            onJoinTournament={async (slugOrId) => {
+              let tourney = localDataService.getTournamentBySlug(slugOrId) || localDataService.getTournamentById(slugOrId);
+              if (!tourney) {
+                tourney = await tournamentService.getTournament(slugOrId);
               }
-              handleNavigate('public-tournament');
+              if (tourney && !localDataService.isTournamentExpiredOrDeleted(tourney).isExpired && !localDataService.isTournamentExpiredOrDeleted(tourney).isDeleted) {
+                localDataService.registerTournament(tourney);
+                localDataService.setActiveTournamentId(tourney.id);
+                localDataService.setLastJoinedTournament(tourney.id, tourney.slug || undefined);
+                setActiveTournament(tourney);
+                setSessionRole(localDataService.getSessionRole(tourney.id));
+                await loadData(tourney.id);
+                handleNavigate('public-tournament');
+              } else {
+                setTournamentNotFound(true);
+                handleNavigate('landing', 'expired');
+              }
             }}
             onOpenPublicDemo={() => {
               handleNavigate('public-tournament');
@@ -643,12 +657,17 @@ export function App() {
                 handleNavigate('workspace');
               }
             }}
-            onJoinTournament={(slug) => {
-              const found = localDataService.getTournamentBySlug(slug);
-              if (found) {
-                handleTournamentChanged(found.id);
+            onJoinTournament={async (slugOrId) => {
+              let tourney = localDataService.getTournamentBySlug(slugOrId) || localDataService.getTournamentById(slugOrId);
+              if (!tourney) {
+                tourney = await tournamentService.getTournament(slugOrId);
               }
-              handleNavigate('public-tournament');
+              if (tourney) {
+                handleTournamentChanged(tourney.id);
+                handleNavigate('public-tournament');
+              } else {
+                handleNavigate('landing');
+              }
             }}
             onOpenPublicDemo={() => {
               handleNavigate('public-tournament');
@@ -680,88 +699,36 @@ export function App() {
     return false;
   }, [isAdminLoggedIn, currentUserId, activeTournament]);
 
-  // Dedicated Edge-to-Edge Participant Shell
-  if (isParticipantRoute) {
-    if (tournamentNotFound) {
-      return (
-        <div className="theme-minecraft-stadium min-h-screen w-full flex flex-col items-center justify-center p-4">
-          <div className="max-w-md w-full stadium-card p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-rose-950/60 border border-rose-800/40 text-rose-400 flex items-center justify-center mx-auto">
-              <Trophy className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-100">Tournament Unavailable</h1>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                The tournament link you entered is invalid, has expired, or was removed by its organizer.
-              </p>
-            </div>
-            <button
-              onClick={() => handleNavigate('landing')}
-              className="w-full py-2.5 stadium-block-btn text-xs font-semibold cursor-pointer"
-            >
-              Return to TournX Home
-            </button>
-          </div>
-        </div>
-      );
-    }
-
+  // If tournament was explicitly not found
+  if (tournamentNotFound) {
     return (
-      <div className="min-h-screen w-full bg-[#0b110e] text-[#f1f5f9] font-sans selection:bg-emerald-900 selection:text-emerald-100 flex flex-col relative overflow-x-hidden">
-        {/* Animated 3D Retro Perspective Grid Background */}
-        <div className="retro-perspective-grid-container" aria-hidden="true">
-          <div className="retro-horizon-glow" />
-          <div className="retro-perspective-grid" />
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#faf9f5] text-[#0f1712]">
+        <div className="max-w-md w-full p-6 sm:p-8 text-center space-y-4 rounded-2xl bg-white border border-[#e5e3d8] shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mx-auto">
+            <Trophy className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-[#0f1712]">Tournament Unavailable</h1>
+            <p className="text-xs text-[#57635a] mt-1 leading-relaxed">
+              The tournament link you entered is invalid, has expired, or was removed by its organizer.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setTournamentNotFound(false);
+              handleNavigate('landing');
+            }}
+            className="w-full py-2.5 rounded-lg bg-[#0f1712] text-white text-xs font-semibold cursor-pointer hover:bg-[#1f2e24] transition"
+          >
+            Return to TournX Home
+          </button>
         </div>
-
-        {showIntro && <OpeningAnimation onComplete={handleIntroComplete} />}
-        
-        <div className="flex-1 w-full relative z-10">
-          {renderCurrentPage()}
-        </div>
-
-        {/* Access Code Modal (VIEW / SCORE) */}
-        <AccessCodeModal
-          isOpen={isAccessModalOpen}
-          onClose={() => setIsAccessModalOpen(false)}
-          tournament={activeTournament}
-          onSuccess={(role) => {
-            setSessionRole(role);
-            loadData();
-          }}
-        />
-
-        {/* Player Profile Modal */}
-        {selectedPlayer && (
-          <PlayerProfileModal
-            player={selectedPlayer}
-            team={selectedPlayerTeam}
-            matches={matches}
-            goals={goals}
-            motms={motms}
-            standings={standings}
-            allPlayers={players}
-            allTeams={teams}
-            onClose={handleClosePlayerModal}
-            onNavigateToTeam={teamId => handleNavigate('team-detail', teamId)}
-            onNavigateToMatch={matchId => handleNavigate('match-detail', matchId)}
-          />
-        )}
-
-        {/* In-App Live Match Window Modal */}
-        <LiveMatchModal
-          isOpen={isLiveWindowOpen}
-          onClose={() => setIsLiveWindowOpen(false)}
-        />
-
-        {/* Vercel Web Analytics */}
-        <Analytics />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0c120e] text-[#faf9f5] font-sans selection:bg-emerald-900 selection:text-emerald-200 relative overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-[#faf9f5] text-[#0f1712] font-sans selection:bg-emerald-900/10 selection:text-emerald-950 relative overflow-x-hidden">
 
       {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (
@@ -772,30 +739,18 @@ export function App() {
       <Navbar
         currentTab={currentTab}
         onNavigate={handleNavigate}
-        onReplayIntro={handleReplayIntro}
-        onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
         isAdminLoggedIn={isAdminLoggedIn}
         activeTournamentName={activeTournament?.name}
-        onOpenTournamentSwitcher={() => setIsSwitcherOpen(true)}
-        onOpenAccessCode={() => setIsAccessModalOpen(true)}
-        onOpenTutorial={() => setIsTutorialOpen(true)}
         sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
+        onShareTournament={() => setIsGlobalShareOpen(true)}
+        onLogout={handleAdminLogout}
       />
 
-
-      {/* Main Page Body */}
+      {/* Main Page Body with Genuine 3D Page Transitions */}
       <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-20 md:pb-8">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentTab + (activeParam || '') + (activeTournament?.id || '')}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderCurrentPage()}
-          </motion.div>
-        </AnimatePresence>
+        <PageTransition3D transitionKey={currentTab + (activeParam || '') + (activeTournament?.id || '')} type="turn">
+          {renderCurrentPage()}
+        </PageTransition3D>
       </main>
 
       {/* Footer */}
@@ -806,6 +761,13 @@ export function App() {
         currentTab={currentTab}
         onNavigate={handleNavigate}
         onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
+      />
+
+      {/* Share Tournament Modal */}
+      <ShareTournamentModal
+        isOpen={isGlobalShareOpen}
+        onClose={() => setIsGlobalShareOpen(false)}
+        tournament={activeTournament}
       />
 
       {/* Tournament Switcher Modal */}

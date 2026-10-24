@@ -45,6 +45,7 @@ import { Tournament, StageType } from '../../types/multiTenant';
 import { Team, Match } from '../../types/tournament';
 
 import { DraftsModal } from '../admin/DraftsModal';
+import { PageTransition3D } from '../PageTransition3D';
 
 interface CreateTournamentWizardProps {
   initialData?: {
@@ -658,6 +659,9 @@ export function CreateTournamentWizard({
       try {
         localStorage.removeItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
       } catch {}
+
+      // Immediately navigate to the newly created tournament workspace overview!
+      onComplete(newTournament);
     } catch (err: any) {
       console.error('Publish error:', err);
       setPublishError(err.message || 'Failed to save tournament draft. Please try again.');
@@ -737,7 +741,7 @@ export function CreateTournamentWizard({
 
       {/* Main Wizard Step Box */}
       <div className="bg-[#111827] border border-[#1f293d] rounded-2xl shadow-xl overflow-hidden text-[#f8fafc]">
-        
+        <PageTransition3D transitionKey={currentStep} type="turn">
         {/* STEP 1: CONVERSATIONAL PROMPT INPUT */}
         {currentStep === 1 && (
           <div className="p-6 sm:p-8 space-y-6">
@@ -2112,7 +2116,7 @@ export function CreateTournamentWizard({
             )}
           </div>
         )}
-
+        </PageTransition3D>
       </div>
 
       {/* Drafts Vault Modal */}

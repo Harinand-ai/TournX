@@ -1,179 +1,152 @@
-import React, { useState } from 'react';
-import { Volume2, VolumeX, Trophy, ChevronDown, KeyRound, Shield, LogIn, HelpCircle } from 'lucide-react';
-import { audioService } from '../services/audioService';
+import React from 'react';
+import { Trophy, Shield, Share2, LogOut, LogIn } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
   onNavigate: (tab: string, param?: string) => void;
   onReplayIntro?: () => void;
-  onOpenLiveWindow?: () => void;
   isAdminLoggedIn?: boolean;
   activeTournamentName?: string;
   onOpenTournamentSwitcher?: () => void;
   onOpenAccessCode?: () => void;
-  onOpenTutorial?: () => void;
   sessionRole?: string;
+  onShareTournament?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onNavigate,
-  onReplayIntro,
-  activeTournamentName,
   isAdminLoggedIn,
+  activeTournamentName,
   onOpenTournamentSwitcher,
-  onOpenAccessCode,
-  onOpenTutorial,
   sessionRole,
+  onShareTournament,
+  onLogout,
 }) => {
-  const [isMuted, setIsMuted] = useState<boolean>(audioService.getMuted());
-
-  const handleToggleSound = () => {
-    const muted = audioService.toggleMute();
-    setIsMuted(muted);
-  };
+  const isPreCreation = currentTab === 'landing' || currentTab === 'organize' || currentTab === 'setup' || currentTab === 'wizard' || currentTab === 'admin-login';
+  const isWorkspace = currentTab === 'workspace' || currentTab === 'admin';
+  const isViewer = currentTab === 'public-tournament' || currentTab === 'matches' || currentTab === 'fixtures' || currentTab === 'results' || currentTab === 'teams' || currentTab === 'stats' || currentTab === 'table';
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#0c130f]/95 border-b border-[#1c2921] backdrop-blur-md shadow-sm text-[#faf9f5]">
+    <header className="sticky top-0 z-40 w-full bg-[#faf9f5]/95 border-b border-[#e5e3d8] backdrop-blur-md text-[#0f1712] transition-colors">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14 sm:h-16">
           
-          {/* Tournament Brand Logo */}
+          {/* Minimalist Editorial Brand Identity */}
           <button
-            onClick={() => {
-              if (onReplayIntro) {
-                onReplayIntro();
-              } else {
-                onNavigate('landing');
-              }
-            }}
+            type="button"
+            onClick={() => onNavigate('landing')}
             className="flex items-center gap-2.5 text-left focus:outline-none group cursor-pointer"
-            title="Click to replay TournX intro animation"
+            title="TournX Home"
           >
-            <div className="w-8 h-8 rounded-xl bg-[#162032] border border-[#2b3a54] flex items-center justify-center text-emerald-400 shadow-xs group-hover:scale-105 transition">
+            <div className="w-8 h-8 rounded-lg bg-[#0f1712] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition">
               <Trophy className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="flex flex-col">
-              <span className="text-sm sm:text-base font-extrabold text-[#f8fafc] tracking-tight">
-                Tourn<span className="text-emerald-400 font-pixel">X</span>
+              <span className="text-base font-extrabold text-[#0f1712] tracking-tight font-sans">
+                Tourn<span className="text-emerald-700">X</span>
               </span>
-              <span className="text-[10px] text-slate-400 tracking-wider lowercase font-sans -mt-0.5">
+              <span className="text-[10px] text-[#57635a] tracking-wider uppercase font-medium -mt-0.5">
                 think • prompt • organise
               </span>
             </div>
           </button>
 
-          {/* Desktop Nav Items */}
-          <nav className="hidden md:flex items-center gap-1.5">
-            <button
-              onClick={() => onNavigate('landing')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition cursor-pointer ${
-                currentTab === 'landing' || currentTab === 'home'
-                  ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
-              }`}
-            >
-              Start
-            </button>
-
-            <button
-              onClick={() => onNavigate('public-tournament')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition cursor-pointer ${
-                currentTab === 'public-tournament' || currentTab === 'matches' || currentTab === 'teams' || currentTab === 'stats'
-                  ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
-              }`}
-            >
-              Scoreboard
-            </button>
-
-            <button
-              onClick={() => onNavigate('workspace')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition cursor-pointer flex items-center gap-1.5 ${
-                currentTab === 'workspace' || currentTab === 'admin'
-                  ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54]'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Workspace</span>
-            </button>
-          </nav>
-
-          {/* Right actions: Switcher + Code + Sound */}
-          <div className="flex items-center gap-2">
-            
-            {/* Tournament Switcher */}
-            {onOpenTournamentSwitcher && (
-              <button
-                onClick={onOpenTournamentSwitcher}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#162032] hover:bg-[#1e2c44] text-slate-200 border border-[#2b3a54] cursor-pointer max-w-[160px] truncate transition"
-                title="Switch Tournament"
-              >
-                <Trophy className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate">{activeTournamentName || 'TournX'}</span>
-                <ChevronDown className="w-3 h-3 shrink-0 text-slate-400" />
-              </button>
-            )}
-
-            {/* Access Code entry / Role Badge */}
-            {onOpenAccessCode && (
-              <button
-                onClick={onOpenAccessCode}
-                title={sessionRole ? `Active session role: ${sessionRole}` : "Enter Access Code"}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wider cursor-pointer border transition ${
-                  sessionRole === 'SCORE'
-                    ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60 font-bold'
-                    : sessionRole === 'VIEW'
-                    ? 'bg-amber-950/60 text-amber-300 border-amber-700/60 font-bold'
-                    : 'bg-[#162032] text-slate-400 border-[#2b3a54] hover:bg-[#1e2c44] hover:text-slate-200'
-                }`}
-              >
-                <KeyRound className="w-3 h-3 shrink-0 text-emerald-400/80" />
-                <span className="hidden sm:inline">{sessionRole || 'Pass'}</span>
-              </button>
-            )}
-
-            {/* Guided Tutorial Button */}
-            {onOpenTutorial && (
-              <button
-                type="button"
-                onClick={onOpenTutorial}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#14261b] hover:bg-[#1a3324] text-emerald-300 border border-[#24432f] cursor-pointer transition shadow-xs"
-                title="Open Guided TournX Tutorial"
-              >
-                <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="hidden sm:inline">Tutorial</span>
-              </button>
-            )}
-
-            {/* Sound Toggle */}
-            <button
-              onClick={handleToggleSound}
-              title={isMuted ? "Unmute audio" : "Mute audio"}
-              className="p-2 rounded-lg bg-[#162032] hover:bg-[#1e2c44] text-slate-300 hover:text-emerald-400 border border-[#2b3a54] transition cursor-pointer"
-            >
-              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-emerald-400" />}
-            </button>
-
-            {/* Quick Organize / Workspace Button */}
-            <button
-              onClick={() => onNavigate(isAdminLoggedIn ? 'workspace' : 'organize')}
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs transition cursor-pointer hidden sm:flex items-center gap-1.5"
-            >
+          {/* Context-Aware Navigation */}
+          {isPreCreation ? (
+            /* PRE-CREATION: Essential minimal header with auth link only */
+            <div className="flex items-center gap-3">
               {isAdminLoggedIn ? (
-                <>
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Workspace</span>
-                </>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('workspace')}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>My Workspace</span>
+                </button>
               ) : (
-                <>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('admin-login')}
+                  className="text-xs font-semibold text-[#57635a] hover:text-[#0f1712] transition cursor-pointer flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-[#e5e3d8] hover:border-[#cfcbc0] bg-white shadow-xs"
+                >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Organize</span>
-                </>
+                  <span>Organizer Sign In</span>
+                </button>
               )}
-            </button>
-          </div>
+            </div>
+          ) : (
+            /* POST-CREATION / IN-TOURNAMENT: Focused workspace or viewer controls */
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Active Tournament Pill */}
+              {activeTournamentName && (
+                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-[#e5e3d8] text-xs font-semibold text-[#0f1712]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                  <span className="max-w-[140px] truncate">{activeTournamentName}</span>
+                </div>
+              )}
+
+              {/* Role Indicator */}
+              {sessionRole && sessionRole !== 'ANONYMOUS' && (
+                <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${
+                  sessionRole === 'ORGANIZER' 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : sessionRole === 'SCORE'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                    : 'bg-[#f4f2ea] text-[#57635a] border border-[#e5e3d8]'
+                }`}>
+                  {sessionRole === 'ORGANIZER' ? 'Organizer' : sessionRole === 'SCORE' ? 'Scorekeeper' : 'Spectator'}
+                </span>
+              )}
+
+              {/* Share Action */}
+              {onShareTournament && (
+                <button
+                  type="button"
+                  onClick={onShareTournament}
+                  className="px-3 py-1.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Share</span>
+                </button>
+              )}
+
+              {/* Switch / View mode toggle */}
+              {isViewer && isAdminLoggedIn && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('workspace')}
+                  className="px-3 py-1.5 rounded-lg border border-[#e5e3d8] bg-white hover:bg-[#f4f2ea] text-xs font-semibold text-[#0f1712] transition cursor-pointer"
+                >
+                  Workspace
+                </button>
+              )}
+
+              {isWorkspace && (
+                <button
+                  type="button"
+                  onClick={() => onNavigate('public-tournament')}
+                  className="px-3 py-1.5 rounded-lg border border-[#e5e3d8] bg-white hover:bg-[#f4f2ea] text-xs font-semibold text-[#0f1712] transition cursor-pointer"
+                >
+                  Public View
+                </button>
+              )}
+
+              {/* Logout */}
+              {isAdminLoggedIn && onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  title="Sign out"
+                  className="p-1.5 rounded-lg text-[#57635a] hover:text-[#0f1712] hover:bg-[#f4f2ea] transition cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

@@ -59,16 +59,6 @@ class TournamentService {
 
         if (data && data.length > 0) {
           const cloudList = (data as Tournament[]).filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
-          const isDev = Boolean(
-            (typeof import.meta !== 'undefined' && import.meta.env && (import.meta.env.DEV || import.meta.env.MODE === 'test')) ||
-            (typeof globalThis !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test')
-          );
-          if (isDev) {
-            const demo = localDataService.getTournamentById(DEMO_TOURNAMENT_ID);
-            if (demo && !cloudList.some(t => t.id === DEMO_TOURNAMENT_ID)) {
-              return [demo, ...cloudList];
-            }
-          }
           return cloudList;
         }
       } catch (err: any) {
@@ -811,6 +801,65 @@ class TournamentService {
       return { success: false, error: data?.error || 'Invalid or revoked access code.' };
     }
     return localDataService.verifyAccessCode(tournamentId, rawCode);
+  }
+
+  /**
+   * Resolves an access code to its exact matching tournament without needing tournamentId in advance.
+   * Checks local storage tournaments, then cloud tournaments.
+   * Never defaults to Apex FC or demo tournament.
+   */
+  async resolveAccessCode(
+    rawCode: string
+  ): Promise<{ success: boolean; tournament?: Tournament; role?: 'VIEW' | 'SCORE'; label?: string; error?: string }> {
+    const trimmed = (rawCode || '').trim();
+    if (!trimmed) {
+      return { success: false, error: 'Please enter a valid tournament access code.' };
+    }
+
+    // 1. Try local data service first
+    const localResult = localDataService.resolveTournamentByAccessCode(trimmed);
+    if (localResult.success) {
+      return localResult;
+    }
+
+    // 2. If Supabase is configured, check cloud tournaments
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: cloudTournaments, error: tourneyErr } = await supabase
+          .from('tournaments')
+          .select('*')
+          .neq('status', 'ARCHIVED')
+          .limit(20);
+
+        if (!tourneyErr && cloudTournaments && cloudTournaments.length > 0) {
+          const voterId = localDataService.getOrCreateVoterId();
+          const normalizedCode = trimmed.toUpperCase();
+          for (const tourney of cloudTournaments) {
+            const { data, error } = await supabase.rpc('redeem_tournament_access_code', {
+              p_tournament_id: tourney.id,
+              p_code: normalizedCode,
+              p_client_identifier: voterId,
+            });
+
+            if (!error && data && data.success) {
+              const cloudTourney = tourney as Tournament;
+              localDataService.registerTournament(cloudTourney);
+              localDataService.setActiveTournamentId(cloudTourney.id);
+              localDataService.setSessionRole(cloudTourney.id, data.role);
+              localDataService.setLastJoinedTournament(cloudTourney.id, cloudTourney.slug || undefined);
+              return { success: true, tournament: cloudTourney, role: data.role, label: data.label };
+            }
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('[TournX] Notice checking cloud access codes:', cloudErr);
+      }
+    }
+
+    return {
+      success: false,
+      error: localResult.error || 'Invalid or revoked access code. Please check your code and try again.',
+    };
   }
 
   // ================= GOALS =================

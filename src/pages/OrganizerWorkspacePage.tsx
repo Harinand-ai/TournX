@@ -35,6 +35,8 @@ import { StatsAndLeadersView } from '../components/stats/StatsAndLeadersView';
 
 import { DraftsModal } from '../components/admin/DraftsModal';
 import { PitchIllustration3D } from '../components/PitchIllustration3D';
+import { ShareTournamentModal } from '../components/ShareTournamentModal';
+import { PageTransition3D } from '../components/PageTransition3D';
 
 interface OrganizerWorkspacePageProps {
   tournament: Tournament;
@@ -73,8 +75,8 @@ export function OrganizerWorkspacePage({
   const [commandSuccessNotice, setCommandSuccessNotice] = useState<string | null>(null);
   const [commandErrorNotice, setCommandErrorNotice] = useState<string | null>(null);
 
-  // Link copy state
-  const [copiedLink, setCopiedLink] = useState(false);
+  // Share Modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Score quick editing modal
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
@@ -264,12 +266,6 @@ export function OrganizerWorkspacePage({
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     return `${origin}/t/${tournament.slug}`;
   }, [tournament.slug]);
-
-  const handleCopyPublicLink = () => {
-    navigator.clipboard.writeText(publicUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
 
   // Dynamic Match computation
   const liveMatches = useMemo(() => {
@@ -499,15 +495,15 @@ export function OrganizerWorkspacePage({
           </p>
         </div>
 
-        {/* Share Link Button */}
+        {/* Prominent Share Tournament Button */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={handleCopyPublicLink}
-            className="px-3.5 py-2 rounded-xl bg-[#141d18] hover:bg-[#1a261f] text-lime-400 text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer border border-[#273a2f]"
+            onClick={() => setIsShareModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition cursor-pointer shadow-xs"
           >
-            {copiedLink ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Share2 className="w-3.5 h-3.5 text-slate-400" />}
-            <span>{copiedLink ? 'Link Copied!' : 'Share Public Link'}</span>
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Share Tournament</span>
           </button>
         </div>
       </div>
@@ -733,6 +729,8 @@ export function OrganizerWorkspacePage({
         ))}
       </div>
 
+      {/* Tab Panels with Real 3D Depth Transitions */}
+      <PageTransition3D transitionKey={activeTab} type="depth">
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1630,6 +1628,7 @@ export function OrganizerWorkspacePage({
           )}
         </div>
       )}
+      </PageTransition3D>
 
       {/* MATCH SCORE & EVENTS EDITOR MODAL */}
       <MatchScoreEditorModal
@@ -1670,6 +1669,13 @@ export function OrganizerWorkspacePage({
           }
         }}
         onDraftsChanged={refreshDraftsCount}
+      />
+
+      {/* PROMINENT SHARE TOURNAMENT MODAL */}
+      <ShareTournamentModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        tournament={tournament}
       />
 
     </div>

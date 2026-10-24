@@ -1,22 +1,15 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
-  Users, 
   Sparkles, 
   ArrowRight, 
   CheckCircle, 
   AlertCircle, 
   Key, 
   LogIn, 
-  UserPlus,
-  Eye,
-  Sliders,
-  Mail,
+  BookOpen,
   FileText,
   Save,
-  BookOpen,
-  Calendar,
   Shield
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, resendConfirmationEmail, sendPasswordResetEmail } from '../lib/supabase';
@@ -24,6 +17,7 @@ import { localDataService, FTM_STORAGE_KEYS } from '../services/localDataService
 import { tournamentService } from '../services/tournamentService';
 import { Tournament } from '../types/multiTenant';
 import { DraftsModal } from '../components/admin/DraftsModal';
+import { PageTransition3D } from '../components/PageTransition3D';
 
 interface LandingPageProps {
   onOrganizeClick: (initialTournamentData?: { name?: string; description?: string; visibility?: 'PUBLIC' | 'PRIVATE'; prompt?: string }) => void;
@@ -37,7 +31,7 @@ interface LandingPageProps {
 
 const EXAMPLE_PROMPTS = [
   {
-    title: 'Kerala Champions Cup (Benchmark)',
+    title: 'Kerala Champions Cup',
     prompt: "I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15, 2026, at Kannur Municipal Stadium. Six teams will participate: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. We want a single round-robin format. Each team can have five starting players and two substitutes. A win gives three points, a draw gives one point and a loss gives zero points. Enable goalscorer tracking and Player of the Match, and make the tournament public to people with the tournament access code."
   },
   {
@@ -53,15 +47,11 @@ const EXAMPLE_PROMPTS = [
 export function LandingPage({
   onOrganizeClick,
   onJoinTournament,
-  onOpenPublicDemo,
   activeTournament,
   noticeMessage,
   onOpenTutorial,
   isAdminLoggedIn = false
 }: LandingPageProps) {
-  // Main Tab: 'ORGANIZE' | 'JOIN'
-  const [activeAction, setActiveAction] = useState<'ORGANIZE' | 'JOIN'>('ORGANIZE');
-
   // Master Prompt Text
   const [masterPromptText, setMasterPromptText] = useState(() => {
     try {
@@ -71,39 +61,17 @@ export function LandingPage({
     }
   });
 
-  // Drafts Modal
   const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
-  const [draftsCount, setDraftsCount] = useState<number>(() => {
-    try {
-      return tournamentService.getDrafts().length;
-    } catch {
-      return 0;
-    }
-  });
+  const [draftsCount, setDraftsCount] = useState<number>(0);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
 
-  // Organizer Auth Mode: 'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD' | 'NONE'
-  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'>('SIGN_IN');
-  const [showAuthSection, setShowAuthSection] = useState(false);
-
-  // Sign up / Sign in fields
-  const [organizerName, setOrganizerName] = useState('');
-  const [organizerEmail, setOrganizerEmail] = useState('');
-  const [organizerPassword, setOrganizerPassword] = useState('');
-
-  // Join fields
-  const [joinCodeOrLink, setJoinCodeOrLink] = useState('');
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
-
-  // Status & Error
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
-  const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  // Clean stale frontend demo keys on mount safely
+  useEffect(() => {
+    localDataService.cleanFrontendDemoState();
+    try {
+      setDraftsCount(tournamentService.getDrafts().length);
+    } catch {}
+  }, []);
 
   const refreshDraftsCount = () => {
     try {
@@ -111,7 +79,33 @@ export function LandingPage({
     } catch {}
   };
 
-  const handleSaveDraft = () => {
+  // Participant Access Code state
+  const [joinCodeOrLink, setJoinCodeOrLink] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
+
+  // Organizer Auth Modal / Form state
+  const [showAuthSection, setShowAuthSection] = useState(false);
+  const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'>('SIGN_IN');
+  const [organizerEmail, setOrganizerEmail] = useState('');
+  const [organizerPassword, setOrganizerPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [confirmationNotice, setConfirmationNotice] = useState<string | null>(null);
+  const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
+
+  const handleLaunchPrompt = () => {
+    if (!masterPromptText.trim()) return;
+    try {
+      localStorage.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, masterPromptText.trim());
+    } catch {}
+    onOrganizeClick({ prompt: masterPromptText.trim() });
+  };
+
+  const handleSavePromptDraft = () => {
     if (!masterPromptText.trim()) return;
     try {
       const now = new Date().toISOString();
@@ -125,219 +119,14 @@ export function LandingPage({
         updated_at: now,
       });
       refreshDraftsCount();
-      setDraftNotice('Draft saved to vault successfully.');
+      setDraftNotice('Prompt draft saved.');
       setTimeout(() => setDraftNotice(null), 3000);
     } catch {
       setDraftNotice('Failed to save draft.');
     }
   };
 
-  const handleGeneratePreview = () => {
-    const prompt = masterPromptText.trim();
-    if (!prompt) return;
-
-    try {
-      localStorage.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, prompt);
-    } catch {}
-
-    // Check if user is already authenticated
-    const hasActiveSession = isAdminLoggedIn || (isSupabaseConfigured && supabase?.auth?.getUser());
-    if (hasActiveSession || import.meta.env.DEV) {
-      onOrganizeClick({ prompt });
-    } else {
-      setShowAuthSection(true);
-      setConfirmationNotice('Prompt saved! Sign in or register to preview, generate fixtures, and publish your tournament.');
-    }
-  };
-
-  // Handle Organizer Sign Up
-  const handleOrganizerSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setConfirmationNotice(null);
-    setIsUnconfirmedError(false);
-    setResendStatus(null);
-
-    const cleanEmail = organizerEmail.trim().toLowerCase();
-
-    if (!cleanEmail || !organizerPassword.trim()) {
-      setErrorMessage('Please provide an email address and password.');
-      return;
-    }
-
-    if (organizerPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: organizerPassword,
-          options: {
-            data: {
-              full_name: organizerName.trim() || undefined,
-            },
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        if (data.session) {
-          onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
-          return;
-        } else if (data.user && !data.session) {
-          if (data.user.identities && data.user.identities.length === 0) {
-            setConfirmationNotice(
-              `An account with ${cleanEmail} already exists. Please sign in below with your password.`
-            );
-            setAuthMode('SIGN_IN');
-            return;
-          }
-
-          setConfirmationNotice(
-            `Registration successful! A verification email has been sent to ${cleanEmail}. Please verify your email to activate your account, then sign in below.`
-          );
-          setAuthMode('SIGN_IN');
-          return;
-        }
-        throw new Error('Registration failed. Please try again.');
-      }
-
-      if (import.meta.env.DEV) {
-        localDataService.setDevAdminLoggedIn(true);
-        onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
-      } else {
-        throw new Error('Authentication service is currently unavailable.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Registration failed. Please check your details.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle Password Reset Request
-  const handlePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setConfirmationNotice(null);
-
-    const cleanEmail = organizerEmail.trim().toLowerCase();
-    if (!cleanEmail) {
-      setErrorMessage('Please enter your email address to receive password reset instructions.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const res = await sendPasswordResetEmail(cleanEmail);
-      if (res.success) {
-        setConfirmationNotice(`Password reset instructions sent to ${cleanEmail}. Please check your inbox.`);
-      } else {
-        setErrorMessage(res.error || 'Failed to send password reset email.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error sending password reset email.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle Organizer Sign In
-  const handleOrganizerSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setConfirmationNotice(null);
-    setIsUnconfirmedError(false);
-    setResendStatus(null);
-
-    const cleanEmail = organizerEmail.trim().toLowerCase();
-
-    if (!cleanEmail || !organizerPassword.trim()) {
-      setErrorMessage('Please enter both your email address and password.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: organizerPassword,
-        });
-
-        if (error) {
-          const isUnconfirmed = 
-            (error as any).code === 'email_not_confirmed' ||
-            error.message.toLowerCase().includes('email not confirmed');
-
-          if (isUnconfirmed) {
-            setIsUnconfirmedError(true);
-            setErrorMessage(
-              `Email not confirmed for ${cleanEmail}. Please verify your email or click resend below.`
-            );
-            return;
-          }
-
-          if ((error as any).code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) {
-            setErrorMessage('Invalid email or password. Please verify your credentials.');
-            return;
-          }
-
-          throw new Error(error.message);
-        }
-
-        if (data.user) {
-          onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
-          return;
-        }
-        throw new Error('Sign in failed. No user session returned.');
-      }
-
-      if (import.meta.env.DEV) {
-        localDataService.setDevAdminLoggedIn(true);
-        onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
-      } else {
-        throw new Error('Authentication service is currently unavailable.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Authentication error.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle Resend Confirmation Email
-  const handleResendConfirmation = async () => {
-    const cleanEmail = organizerEmail.trim().toLowerCase();
-    if (!cleanEmail) {
-      setErrorMessage('Please enter your email address to resend confirmation.');
-      return;
-    }
-    setIsResending(true);
-    setResendStatus(null);
-    try {
-      const res = await resendConfirmationEmail(cleanEmail);
-      if (res.success) {
-        setResendStatus(`Confirmation email resent to ${cleanEmail}. Please check your inbox and spam folder.`);
-      } else {
-        setErrorMessage(res.error || 'Failed to resend confirmation email.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error resending confirmation.');
-    } finally {
-      setIsResending(false);
-    }
-  };
-
-  // Handle Join a Tournament (Code or Link or Slug)
+  // Handle Join Tournament via Access Code or Direct Link
   const handleJoinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setJoinError(null);
@@ -345,11 +134,11 @@ export function LandingPage({
 
     const input = joinCodeOrLink.trim();
     if (!input) {
-      setJoinError('Please enter a tournament link, slug, or access code.');
+      setJoinError('Please enter a tournament access code or link.');
       return;
     }
 
-    // 1. Check if user pasted a full URL or path
+    // 1. Direct URL paste: /t/:slug
     const urlMatch = input.match(/(?:^|\/)t\/([a-zA-Z0-9_-]+)/);
     if (urlMatch && urlMatch[1]) {
       const slug = urlMatch[1];
@@ -357,55 +146,29 @@ export function LandingPage({
       return;
     }
 
-    // 2. Check if it's a known tournament slug or name
-    const allTournaments = localDataService.getAllTournaments();
-    const matchedTourney = allTournaments.find(
-      t => (t.slug && t.slug.toLowerCase() === input.toLowerCase()) || t.name.toLowerCase() === input.toLowerCase()
-    );
-    if (matchedTourney && matchedTourney.slug) {
-      onJoinTournament(matchedTourney.slug);
-      return;
-    }
-
-    // 3. Attempt Access Code Verification
+    // 2. Strict Access Code Resolution via tournamentService
     setIsVerifyingCode(true);
     try {
-      const activeTourney = activeTournament || localDataService.getActiveTournament();
-      const verifyResult = await tournamentService.verifyAccessCode(activeTourney.id, input);
-
-      if (verifyResult.success) {
-        setJoinSuccess(`Pass verified! Unlocked ${verifyResult.role} access to "${activeTourney.name}".`);
+      const result = await tournamentService.resolveAccessCode(input);
+      if (result.success && result.tournament) {
+        setJoinSuccess(`Pass verified! Loading ${result.tournament.name}...`);
         setTimeout(() => {
-          onJoinTournament(activeTourney.slug || 'tournx-championship');
-        }, 700);
+          onJoinTournament(result.tournament!.slug || result.tournament!.id);
+        }, 500);
         return;
       }
 
-      // Check remaining tournaments
-      for (const t of allTournaments) {
-        if (t.id === activeTourney.id) continue;
-        const res = await tournamentService.verifyAccessCode(t.id, input);
-        if (res.success) {
-          setJoinSuccess(`Pass verified! Unlocked ${res.role} access to "${t.name}".`);
-          setTimeout(() => {
-            onJoinTournament(t.slug || 'tournx-championship');
-          }, 700);
-          return;
-        }
-      }
-
-      const isPureSlugFormat = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.toLowerCase()) && 
-        !input.toUpperCase().startsWith('TX-') && 
-        !input.toUpperCase().includes('VIEW') && 
-        !input.toUpperCase().includes('SCORE');
-
-      if (isPureSlugFormat && !verifyResult.error?.includes('Rate limit')) {
-        const cleanSlug = input.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-        onJoinTournament(cleanSlug);
+      // 3. Fallback: Check if it's a direct known slug
+      const allTournaments = localDataService.getAllTournaments();
+      const matched = allTournaments.find(
+        t => (t.slug && t.slug.toLowerCase() === input.toLowerCase()) || t.id === input
+      );
+      if (matched) {
+        onJoinTournament(matched.slug || matched.id);
         return;
       }
 
-      setJoinError(verifyResult.error || 'Invalid or revoked access code. Please verify your code or link.');
+      setJoinError(result.error || 'Invalid or revoked access code. Please verify your code and try again.');
     } catch (err: any) {
       setJoinError(err.message || 'Access code verification failed.');
     } finally {
@@ -413,595 +176,529 @@ export function LandingPage({
     }
   };
 
+  // Organizer Sign-in
+  const handleOrganizerSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage(null);
+    setConfirmationNotice(null);
+    setIsUnconfirmedError(false);
+
+    try {
+      if (!isSupabaseConfigured || !supabase) {
+        localDataService.setDevAdminLoggedIn(true);
+        onOrganizeClick();
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: organizerEmail.trim(),
+        password: organizerPassword,
+      });
+
+      if (error) {
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          setIsUnconfirmedError(true);
+          throw new Error('Your email address has not been confirmed yet.');
+        }
+        throw error;
+      }
+
+      if (data?.user) {
+        onOrganizeClick();
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to sign in.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Organizer Sign-up
+  const handleOrganizerSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage(null);
+    setConfirmationNotice(null);
+
+    try {
+      if (!isSupabaseConfigured || !supabase) {
+        localDataService.setDevAdminLoggedIn(true);
+        onOrganizeClick();
+        return;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email: organizerEmail.trim(),
+        password: organizerPassword,
+      });
+
+      if (error) throw error;
+
+      if (data?.user?.identities?.length === 0) {
+        throw new Error('An account with this email already exists.');
+      }
+
+      setConfirmationNotice('Confirmation email sent! Please check your inbox.');
+      setAuthMode('SIGN_IN');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to sign up.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Password recovery
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage(null);
+    setConfirmationNotice(null);
+
+    try {
+      const res = await sendPasswordResetEmail(organizerEmail.trim());
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to send recovery email.');
+      }
+      setConfirmationNotice('Password recovery email dispatched.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Password recovery failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!organizerEmail.trim() || isResending) return;
+    setIsResending(true);
+    setResendStatus(null);
+    try {
+      const res = await resendConfirmationEmail(organizerEmail.trim());
+      if (res.success) {
+        setResendStatus('Verification link dispatched.');
+      } else {
+        setErrorMessage(res.error || 'Failed to resend confirmation.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to resend verification.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   return (
-    <div className="w-full min-h-[90vh] flex flex-col justify-center items-center py-6 px-4 sm:px-6 bg-[#0c120e] text-[#faf9f5] relative">
-      
-      {/* Brand Header */}
-      <div className="text-center max-w-2xl mx-auto mb-6 relative z-10">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111f16] border border-[#1e3425] text-emerald-400 text-xs font-semibold tracking-wider uppercase mb-3 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-          <span>NATURAL LANGUAGE FOOTBALL MANAGEMENT</span>
+    <PageTransition3D transitionKey="landing" type="fade">
+      <div className="w-full min-h-[85vh] flex flex-col justify-center items-center py-8 px-4 sm:px-6 bg-[#faf9f5] text-[#0f1712]">
+        
+        {/* Editorial Header Composition */}
+        <div className="text-center max-w-2xl mx-auto mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f4f2ea] border border-[#e5e3d8] text-emerald-800 text-[11px] font-semibold tracking-wider uppercase mb-4 shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+            <span>NATURAL LANGUAGE FOOTBALL MANAGEMENT</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#0f1712] mb-3 font-sans">
+            Tourn<span className="text-emerald-700">X</span>
+          </h1>
+          <p className="text-sm sm:text-base text-[#57635a] max-w-lg mx-auto font-sans leading-relaxed">
+            From a single sentence in plain English to official fixtures, live scoreboards, and squad rosters.
+          </p>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#faf9f5] mb-2 font-sans">
-          Tourn<span className="text-emerald-400">X</span>
-        </h1>
-        <p className="text-sm sm:text-base text-slate-300 max-w-lg mx-auto font-sans leading-relaxed">
-          From a single sentence in plain English to official fixtures, live scoreboards, and squad management.
-        </p>
-
-        {/* Tutorial Quick Access */}
-        {onOpenTutorial && (
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={onOpenTutorial}
-              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 bg-[#132219] hover:bg-[#182b20] border border-[#203a29] px-3 py-1.5 rounded-xl transition cursor-pointer font-medium shadow-xs"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Interactive 6-Step Tutorial</span>
-            </button>
+        {/* Global Notice Message if present */}
+        {noticeMessage && (
+          <div className="w-full max-w-2xl mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2.5 shadow-xs">
+            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+            <div className="flex-1 leading-relaxed">{noticeMessage}</div>
           </div>
         )}
-      </div>
 
-      {/* Notice Message */}
-      {noticeMessage && (
-        <div className="w-full max-w-2xl mb-5 p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <span>{noticeMessage}</span>
-        </div>
-      )}
-
-      {/* Main Console Container */}
-      <div className="w-full max-w-3xl bg-[#0f1712] border border-[#1e3425] rounded-2xl shadow-2xl overflow-hidden relative z-10">
-        
-        {/* Navigation Tabs Strip */}
-        <div className="grid grid-cols-2 p-1.5 bg-[#0a110d] border-b border-[#1e3425]">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveAction('ORGANIZE');
-              setErrorMessage(null);
-            }}
-            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
-              activeAction === 'ORGANIZE'
-                ? 'bg-[#16271c] text-emerald-400 border border-[#2b4c35] shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111d15]'
-            }`}
-          >
-            <Trophy className="w-4 h-4 text-emerald-400" />
-            <span>Organize Tournament</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveAction('JOIN');
-              setErrorMessage(null);
-            }}
-            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
-              activeAction === 'JOIN'
-                ? 'bg-[#16271c] text-emerald-400 border border-[#2b4c35] shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111d15]'
-            }`}
-          >
-            <Users className="w-4 h-4 text-emerald-400" />
-            <span>Join with Pass or Code</span>
-          </button>
-        </div>
-
-        {/* Card Body */}
-        <div className="p-6 sm:p-8 space-y-6">
-          
-          <AnimatePresence mode="wait">
+        {/* THE SINGLE DOMINANT VISUAL ELEMENT: Editorial Master Prompt Composer */}
+        <div className="w-full max-w-3xl mb-8">
+          <div className="relative p-6 sm:p-8 rounded-2xl bg-white border border-[#e5e3d8] shadow-sm overflow-hidden">
             
-            {/* ACTION 1: ORGANIZE A TOURNAMENT (CENTRAL MASTER PROMPT CREATOR) */}
-            {activeAction === 'ORGANIZE' && (
-              <motion.div
-                key="organize-pane"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-6"
-              >
-                {/* Central Master Prompt Creator */}
-                <div className="space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h2 className="text-xl sm:text-2xl font-bold text-[#faf9f5] tracking-tight">
-                        Describe your tournament in natural English
-                      </h2>
-                      <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
-                        Type teams, dates, venue, format, and rules. TournX extracts everything and generates your preview instantly.
-                      </p>
-                    </div>
+            {/* Header row: Status badge + Contextual Tutorial Button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                <span className="text-xs font-semibold text-[#0f1712] uppercase tracking-wider">
+                  Tournament Creator
+                </span>
+              </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setIsDraftsModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto shrink-0"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Saved Drafts</span>
-                      {draftsCount > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
-                          {draftsCount}
-                        </span>
-                      )}
-                    </button>
-                  </div>
+              <div className="flex items-center gap-2">
+                {/* Contextual Tutorial Discovery Point */}
+                {onOpenTutorial && (
+                  <button
+                    type="button"
+                    onClick={onOpenTutorial}
+                    className="inline-flex items-center gap-1.5 text-xs text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition cursor-pointer font-medium shadow-xs"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>6-Step Tutorial</span>
+                  </button>
+                )}
 
-                  {/* Large Prompt Textarea */}
-                  <div className="relative">
-                    <textarea
-                      rows={5}
-                      value={masterPromptText}
-                      onChange={(e) => setMasterPromptText(e.target.value)}
-                      placeholder="e.g. I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15 at Kannur Municipal Stadium. Six teams: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. Single round-robin format with three points for a win, one for a draw..."
-                      className="w-full px-4 py-3 rounded-xl bg-[#0a110d] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500 resize-none font-sans leading-relaxed"
-                    />
-                  </div>
-
-                  {/* Example prompt chips */}
-                  <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] text-slate-400 font-medium">Click to try an example:</span>
-                    <div className="flex flex-wrap gap-2">
-                      {EXAMPLE_PROMPTS.map((ex, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setMasterPromptText(ex.prompt)}
-                          className="px-2.5 py-1 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-slate-300 hover:text-white text-xs transition cursor-pointer text-left"
-                        >
-                          {ex.title}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Prompt Actions */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveDraft}
-                      disabled={!masterPromptText.trim()}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
-                    >
-                      <Save className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Save as Draft</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleGeneratePreview}
-                      disabled={!masterPromptText.trim()}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 group"
-                    >
-                      <span>Generate Preview</span>
-                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                    </button>
-                  </div>
-
-                  {draftNotice && (
-                    <p className="text-xs text-emerald-400 text-center pt-1 animate-pulse">
-                      {draftNotice}
-                    </p>
+                <button
+                  type="button"
+                  onClick={() => setIsDraftsModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-[#f4f2ea] hover:bg-[#eae7dc] border border-[#e5e3d8] text-[#57635a] hover:text-[#0f1712] text-xs font-medium flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Drafts</span>
+                  {draftsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                      {draftsCount}
+                    </span>
                   )}
+                </button>
+              </div>
+            </div>
+
+            {/* Title & Description */}
+            <div className="mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#0f1712] tracking-tight">
+                Describe your tournament. Generate it. Review it. Confirm it.
+              </h2>
+              <p className="text-xs sm:text-sm text-[#57635a] mt-1 font-sans leading-relaxed">
+                Type your tournament setup in natural English. TournX extracts clubs, formats, squad sizes, and venues instantly.
+              </p>
+            </div>
+
+            {/* Prompt Composer Box */}
+            <div className="space-y-4">
+              <textarea
+                value={masterPromptText}
+                onChange={(e) => setMasterPromptText(e.target.value)}
+                placeholder="e.g. Create an 8-team tournament with Arsenal, Chelsea, Liverpool, Spurs, Man City, Man United, Everton and Aston Villa at college ground tomorrow 5 pm"
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl bg-[#faf9f5] border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600 focus:bg-white font-sans placeholder:text-[#8a968d] transition resize-none leading-relaxed"
+              />
+
+              {/* Curated Prompt Chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-[#57635a] font-medium">Examples:</span>
+                {EXAMPLE_PROMPTS.map((ex) => (
+                  <button
+                    key={ex.title}
+                    type="button"
+                    onClick={() => setMasterPromptText(ex.prompt)}
+                    className="px-2.5 py-1 rounded-lg bg-[#f4f2ea] hover:bg-[#eae7dc] border border-[#e5e3d8] text-[#0f1712] text-[11px] transition cursor-pointer"
+                  >
+                    "{ex.title}"
+                  </button>
+                ))}
+              </div>
+
+              {/* Actions row */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSavePromptDraft}
+                  disabled={!masterPromptText.trim()}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-[#f4f2ea] hover:bg-[#eae7dc] border border-[#e5e3d8] text-[#57635a] hover:text-[#0f1712] text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+                >
+                  <Save className="w-3.5 h-3.5 text-[#57635a]" />
+                  <span>Save Draft</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLaunchPrompt}
+                  disabled={!masterPromptText.trim()}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white font-semibold text-sm shadow-xs transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 group"
+                >
+                  <span>Generate Preview</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
+
+              {draftNotice && (
+                <p className="text-xs text-emerald-800 text-center pt-1 font-medium">
+                  {draftNotice}
+                </p>
+              )}
+            </div>
+
+            {/* Active tournament quick link if organizer is signed in */}
+            {activeTournament && (
+              <div className="mt-6 pt-4 border-t border-[#e5e3d8] flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-[#0f1712]">
+                    Current Workspace: {activeTournament.name}
+                  </div>
+                  <div className="text-[11px] text-[#57635a]">
+                    {activeTournament.season || '2026'} • {activeTournament.visibility}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOrganizeClick()}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-xs font-semibold text-white transition cursor-pointer"
+                >
+                  Open Workspace
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* RESTRAINED ACCESS CODE ENTRY FOR PARTICIPANTS */}
+        <div className="w-full max-w-3xl mb-8">
+          <div className="p-6 rounded-2xl bg-white border border-[#e5e3d8] shadow-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <Key className="w-4 h-4 text-emerald-700" />
+              <h2 className="text-sm font-bold text-[#0f1712] uppercase tracking-wider">
+                Enter with Access Code or Tournament Link
+              </h2>
+            </div>
+            <p className="text-xs text-[#57635a] mb-4 leading-relaxed">
+              Have an access pass or participant code? Enter it below to open the tournament scoreboard, fixtures, and standings.
+            </p>
+
+            {joinSuccess && (
+              <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>{joinSuccess}</span>
+              </div>
+            )}
+
+            {joinError && (
+              <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                <span>{joinError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleJoinSubmit} className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  required
+                  value={joinCodeOrLink}
+                  onChange={(e) => setJoinCodeOrLink(e.target.value)}
+                  placeholder="e.g. TX-VIEW-... or tournament link"
+                  className="w-full px-4 py-2.5 rounded-lg bg-[#faf9f5] border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600 focus:bg-white font-mono placeholder:text-[#8a968d] transition"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isVerifyingCode}
+                className="px-6 py-2.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white font-semibold text-xs transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isVerifyingCode ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <>
+                    <span>Enter Tournament</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* ORGANIZER SIGN-IN SECTION */}
+        <div className="w-full max-w-3xl">
+          <div className="p-5 rounded-xl border border-[#e5e3d8] bg-[#f7f6f1] text-center">
+            {!showAuthSection ? (
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#57635a]">
+                  Organizing a league or managing clubs?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAuthSection(true)}
+                  className="text-xs font-semibold text-[#0f1712] hover:text-emerald-800 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Organizer Sign In</span>
+                </button>
+              </div>
+            ) : (
+              <div className="text-left space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[#e5e3d8]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#0f1712]">
+                    {authMode === 'SIGN_UP' ? 'Create Organizer Account' : authMode === 'FORGOT_PASSWORD' ? 'Reset Password' : 'Organizer Sign In'}
+                  </span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('SIGN_IN');
+                        setErrorMessage(null);
+                        setConfirmationNotice(null);
+                      }}
+                      className={`font-semibold cursor-pointer ${authMode === 'SIGN_IN' ? 'text-emerald-800 underline' : 'text-[#57635a]'}`}
+                    >
+                      Sign In
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('SIGN_UP');
+                        setErrorMessage(null);
+                        setConfirmationNotice(null);
+                      }}
+                      className={`font-semibold cursor-pointer ${authMode === 'SIGN_UP' ? 'text-emerald-800 underline' : 'text-[#57635a]'}`}
+                    >
+                      Sign Up
+                    </button>
+                  </div>
                 </div>
 
-                {/* Organizer Current Tournament / Direct Dashboard Link */}
-                {activeTournament && (
-                  <div className="p-4 rounded-xl bg-[#0a110d] border border-[#1e3425] flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-[#faf9f5]">
-                        Active Tournament: {activeTournament.name}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        {activeTournament.season || '2026'} • {activeTournament.visibility}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onOrganizeClick()}
-                      className="px-3.5 py-1.5 rounded-lg bg-[#16271c] hover:bg-[#1c3224] border border-[#2b4c35] text-xs font-semibold text-emerald-400 transition cursor-pointer"
-                    >
-                      Open Dashboard
-                    </button>
+                {errorMessage && (
+                  <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                    <span>{errorMessage}</span>
                   </div>
                 )}
 
-                {/* Notifications */}
                 {confirmationNotice && (
-                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0" />
                     <span>{confirmationNotice}</span>
                   </div>
                 )}
 
-                {resendStatus && (
-                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>{resendStatus}</span>
-                  </div>
-                )}
-
-                {errorMessage && (
-                  <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2.5">
-                    <div className="flex items-start gap-2.5">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                      <span className="flex-1">{errorMessage}</span>
-                    </div>
-                    {isUnconfirmedError && (
-                      <div className="pt-2 border-t border-rose-800/40 flex items-center justify-between">
-                        <span className="text-[11px] text-rose-400">Need a verification link?</span>
-                        <button
-                          type="button"
-                          onClick={handleResendConfirmation}
-                          disabled={isResending}
-                          className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
-                        >
-                          {isResending ? 'Sending...' : 'Resend Email'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Optional Sign In / Registration Panel */}
-                <div className="pt-4 border-t border-[#1e3425]">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
-                      {showAuthSection ? (authMode === 'SIGN_UP' ? 'Organizer Registration' : authMode === 'FORGOT_PASSWORD' ? 'Password Recovery' : 'Organizer Sign In') : 'Organizer Account'}
-                    </span>
-                    
-                    {!showAuthSection ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowAuthSection(true)}
-                        className="text-xs text-emerald-400 hover:underline cursor-pointer font-medium"
-                      >
-                        Sign in to manage tournament →
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthMode('SIGN_IN');
-                            setErrorMessage(null);
-                            setConfirmationNotice(null);
-                          }}
-                          className={`font-semibold cursor-pointer transition ${
-                            authMode === 'SIGN_IN' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          Sign In
-                        </button>
-                        <span className="text-slate-600">•</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthMode('SIGN_UP');
-                            setErrorMessage(null);
-                            setConfirmationNotice(null);
-                          }}
-                          className={`font-semibold cursor-pointer transition ${
-                            authMode === 'SIGN_UP' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          Sign Up
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {showAuthSection && (
-                    <div className="bg-[#0a110d] p-5 rounded-xl border border-[#1e3425]">
-                      {/* Form: SIGN IN */}
-                      {authMode === 'SIGN_IN' && (
-                        <form onSubmit={handleOrganizerSignIn} className="space-y-4">
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-300">Email Address</label>
-                            <input
-                              type="email"
-                              required
-                              value={organizerEmail}
-                              onChange={(e) => setOrganizerEmail(e.target.value)}
-                              placeholder="organizer@club.com"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <label className="text-xs font-semibold text-slate-300">Password</label>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAuthMode('FORGOT_PASSWORD');
-                                  setErrorMessage(null);
-                                  setConfirmationNotice(null);
-                                }}
-                                className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
-                              >
-                                Forgot password?
-                              </button>
-                            </div>
-                            <input
-                              type="password"
-                              required
-                              value={organizerPassword}
-                              onChange={(e) => setOrganizerPassword(e.target.value)}
-                              placeholder="••••••••••••"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                          >
-                            {isLoading ? (
-                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                            ) : (
-                              <>
-                                <LogIn className="w-4 h-4" />
-                                <span>Sign In & Continue</span>
-                                <ArrowRight className="w-4 h-4 ml-1" />
-                              </>
-                            )}
-                          </button>
-                        </form>
-                      )}
-
-                      {/* Form: SIGN UP */}
-                      {authMode === 'SIGN_UP' && (
-                        <form onSubmit={handleOrganizerSignUp} className="space-y-4">
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-300">Organizer Name (Optional)</label>
-                            <input
-                              type="text"
-                              value={organizerName}
-                              onChange={(e) => setOrganizerName(e.target.value)}
-                              placeholder="e.g. Alex Ferguson"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-300">Email Address *</label>
-                            <input
-                              type="email"
-                              required
-                              value={organizerEmail}
-                              onChange={(e) => setOrganizerEmail(e.target.value)}
-                              placeholder="organizer@club.com"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-300">Password *</label>
-                            <input
-                              type="password"
-                              required
-                              value={organizerPassword}
-                              onChange={(e) => setOrganizerPassword(e.target.value)}
-                              placeholder="At least 6 characters"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                          >
-                            {isLoading ? (
-                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                            ) : (
-                              <>
-                                <UserPlus className="w-4 h-4" />
-                                <span>Create Organizer Account</span>
-                                <ArrowRight className="w-4 h-4 ml-1" />
-                              </>
-                            )}
-                          </button>
-                        </form>
-                      )}
-
-                      {/* Form: FORGOT PASSWORD */}
-                      {authMode === 'FORGOT_PASSWORD' && (
-                        <form onSubmit={handlePasswordReset} className="space-y-4">
-                          <p className="text-xs text-slate-400 leading-relaxed">
-                            Enter the email address associated with your organizer account to receive a reset link.
-                          </p>
-
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-300">Email Address</label>
-                            <input
-                              type="email"
-                              required
-                              value={organizerEmail}
-                              onChange={(e) => setOrganizerEmail(e.target.value)}
-                              placeholder="organizer@club.com"
-                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                            />
-                          </div>
-
-                          <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                          >
-                            {isLoading ? (
-                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                            ) : (
-                              <>
-                                <Mail className="w-4 h-4" />
-                                <span>Send Reset Link</span>
-                                <ArrowRight className="w-4 h-4 ml-1" />
-                              </>
-                            )}
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-
-            {/* ACTION 2: JOIN A TOURNAMENT */}
-            {activeAction === 'JOIN' && (
-              <motion.div
-                key="join-pane"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-5"
-              >
-                <div className="space-y-1">
-                  <h2 className="text-lg font-bold text-[#faf9f5]">Enter Tournament Access Code</h2>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Enter an access code, matchday pass, or tournament link to view live fixtures and standings.
-                  </p>
-                </div>
-
-                {joinSuccess && (
-                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>{joinSuccess}</span>
-                  </div>
-                )}
-
-                {joinError && (
-                  <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>{joinError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleJoinSubmit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-300">
-                      Matchday Pass / Access Code / Slug
-                    </label>
-                    <div className="relative">
+                {authMode === 'SIGN_IN' && (
+                  <form onSubmit={handleOrganizerSignIn} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#0f1712] mb-1">Email</label>
                       <input
-                        type="text"
+                        type="email"
                         required
-                        value={joinCodeOrLink}
-                        onChange={(e) => setJoinCodeOrLink(e.target.value)}
-                        placeholder="e.g. TX-VIEW-9876 or tournx-championship"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0a110d] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition pl-10 font-mono placeholder:text-slate-500"
+                        value={organizerEmail}
+                        onChange={(e) => setOrganizerEmail(e.target.value)}
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2 rounded-lg bg-white border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600"
                       />
-                      <Key className="w-4 h-4 text-emerald-400/80 absolute left-3.5 top-3" />
                     </div>
-                  </div>
-
-                  {/* Built-in Demo Passes Helper */}
-                  <div className="p-3.5 rounded-xl bg-[#0a110d] border border-[#1e3425] space-y-2">
-                    <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
-                      Demo Tournament Passes:
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setJoinCodeOrLink('TX-VIEW-9876');
-                          setJoinError(null);
-                        }}
-                        className="py-2 px-3 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-left transition cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>TX-VIEW-9876</span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">Spectator Pass</div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setJoinCodeOrLink('TX-SCORE-9876');
-                          setJoinError(null);
-                        }}
-                        className="py-2 px-3 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-left transition cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
-                          <Sliders className="w-3.5 h-3.5" />
-                          <span>TX-SCORE-9876</span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">Scorekeeper Pass</div>
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isVerifyingCode}
-                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                  >
-                    {isVerifyingCode ? (
-                      <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    ) : (
-                      <>
-                        <span>Enter Tournament</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
-
-                {/* Instant Public Showcase Card */}
-                <div className="mt-6 pt-5 border-t border-[#1e3425]">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0a110d] border border-[#1e3425]">
-                    <div className="min-w-0 pr-2">
-                      <div className="text-xs font-bold text-slate-200 truncate">
-                        {activeTournament?.name || 'TournX Championship'}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-[#0f1712]">Password</label>
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode('FORGOT_PASSWORD')}
+                          className="text-[11px] text-[#57635a] hover:text-[#0f1712]"
+                        >
+                          Forgot?
+                        </button>
                       </div>
-                      <div className="text-[11px] text-slate-400 font-sans mt-0.5">
-                        Live Public Showcase
-                      </div>
+                      <input
+                        type="password"
+                        required
+                        value={organizerPassword}
+                        onChange={(e) => setOrganizerPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-3.5 py-2 rounded-lg bg-white border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600"
+                      />
                     </div>
                     <button
-                      type="button"
-                      onClick={onOpenPublicDemo}
-                      className="shrink-0 py-1.5 px-3 rounded-lg bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-xs font-semibold text-emerald-400 transition cursor-pointer"
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-2.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white font-semibold text-xs cursor-pointer transition disabled:opacity-50"
                     >
-                      View Live Scoreboard
+                      {isLoading ? 'Signing In...' : 'Sign In'}
+                    </button>
+                  </form>
+                )}
+
+                {authMode === 'SIGN_UP' && (
+                  <form onSubmit={handleOrganizerSignUp} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#0f1712] mb-1">Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={organizerEmail}
+                        onChange={(e) => setOrganizerEmail(e.target.value)}
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2 rounded-lg bg-white border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#0f1712] mb-1">Password</label>
+                      <input
+                        type="password"
+                        required
+                        value={organizerPassword}
+                        onChange={(e) => setOrganizerPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-3.5 py-2 rounded-lg bg-white border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs cursor-pointer transition disabled:opacity-50"
+                    >
+                      {isLoading ? 'Creating Account...' : 'Create Account'}
+                    </button>
+                  </form>
+                )}
+
+                {authMode === 'FORGOT_PASSWORD' && (
+                  <form onSubmit={handleForgotPassword} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#0f1712] mb-1">Email</label>
+                      <input
+                        type="email"
+                        required
+                        value={organizerEmail}
+                        onChange={(e) => setOrganizerEmail(e.target.value)}
+                        placeholder="organizer@club.com"
+                        className="w-full px-3.5 py-2 rounded-lg bg-white border border-[#e5e3d8] text-[#0f1712] text-sm focus:outline-none focus:border-emerald-600"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-2.5 rounded-lg bg-[#0f1712] hover:bg-[#1f2e24] text-white font-semibold text-xs cursor-pointer transition disabled:opacity-50"
+                    >
+                      {isLoading ? 'Sending...' : 'Send Recovery Link'}
+                    </button>
+                  </form>
+                )}
+
+                {isUnconfirmedError && (
+                  <div className="pt-2 border-t border-[#e5e3d8] flex items-center justify-between text-xs">
+                    <span className="text-[#57635a]">Need a new confirmation email?</span>
+                    <button
+                      type="button"
+                      onClick={handleResendConfirmation}
+                      disabled={isResending}
+                      className="font-semibold text-emerald-800 hover:underline"
+                    >
+                      {isResending ? 'Sending...' : 'Resend Email'}
                     </button>
                   </div>
-                </div>
-              </motion.div>
+                )}
+                {resendStatus && (
+                  <p className="text-xs text-emerald-800">{resendStatus}</p>
+                )}
+              </div>
             )}
-
-          </AnimatePresence>
-
+          </div>
         </div>
+
+        {/* DRAFTS VAULT MODAL */}
+        <DraftsModal
+          isOpen={isDraftsModalOpen}
+          onClose={() => setIsDraftsModalOpen(false)}
+          onSelectDraft={(draft) => {
+            if (draft.prompt) {
+              setMasterPromptText(draft.prompt);
+            }
+          }}
+          onDraftsChanged={refreshDraftsCount}
+        />
+
       </div>
-
-      {/* Drafts Modal */}
-      <DraftsModal
-        isOpen={isDraftsModalOpen}
-        onClose={() => setIsDraftsModalOpen(false)}
-        onSelectDraft={(draft) => {
-          setMasterPromptText(draft.prompt);
-          setIsDraftsModalOpen(false);
-        }}
-        onDraftsChanged={refreshDraftsCount}
-      />
-
-      {/* Clean Professional Footer */}
-      <div className="mt-8 text-center text-xs text-slate-400 tracking-wide font-sans">
-        TournX • Professional Sports Management • Real-time Sync & Isolated Tenancy
-      </div>
-
-    </div>
+    </PageTransition3D>
   );
 }

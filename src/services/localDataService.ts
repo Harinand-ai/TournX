@@ -79,6 +79,29 @@ export const FTM_STORAGE_KEYS = {
 
 export const DEMO_TOURNAMENT_ID = 'ftm-demo-tourney-01';
 
+export const DEFAULT_CLEAN_TOURNAMENT: Tournament = {
+  id: 'tournx-initial',
+  name: 'TournX Tournament',
+  slug: 'tournx-tournament',
+  status: 'DRAFT',
+  visibility: 'PRIVATE',
+  rules_config: {
+    points_for_win: 3,
+    points_for_draw: 1,
+    points_for_loss: 0,
+    tie_breaker_order: ['POINTS', 'GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD'],
+    match_duration_minutes: 50,
+    half_time_duration_minutes: 5,
+    sport: 'FOOTBALL',
+    match_type: 'SINGLE_ROUND_ROBIN',
+    starting_players_per_team: 5,
+    substitutes_per_team: 2,
+    squad_size: 7,
+  },
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
+};
+
 export function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -195,6 +218,8 @@ class MemoryStorage {
 const memoryStorage = new MemoryStorage();
 
 class LocalDataService {
+  private isInitializing = false;
+
   private getStorage(): {
     getItem(k: string): string | null;
     setItem(k: string, v: string): void;
@@ -232,86 +257,77 @@ class LocalDataService {
 
   /**
    * Initializes local storage with synthetic demo tournament and versioned schema.
+  /**
+   * Safely cleans legacy demo/sample tournament entries from the frontend
+   * without deleting or modifying any Supabase cloud records.
+   */
+  public cleanFrontendDemoState(): void {
+    const storage = this.getStorage();
+    const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
+    const cleaned = all.filter(
+      t => t.id !== DEMO_TOURNAMENT_ID && !t.name.toLowerCase().includes('tournx championship')
+    );
+    this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, cleaned);
+
+    const demoPrefix = `ftm_dev_t_${DEMO_TOURNAMENT_ID}`;
+    ['teams', 'players', 'matches', 'goals', 'assists', 'motm', 'committee', 'rules', 'access_codes'].forEach(res => {
+      storage.removeItem(`${demoPrefix}_${res}`);
+    });
+
+    const activeId = storage.getItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+    if (activeId === DEMO_TOURNAMENT_ID) {
+      if (cleaned.length > 0) {
+        storage.setItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID, cleaned[0].id);
+      } else {
+        storage.removeItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+      }
+    }
+
+    const lastId = storage.getItem(FTM_STORAGE_KEYS.LAST_JOINED_ID);
+    if (lastId === DEMO_TOURNAMENT_ID) {
+      storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_ID);
+      storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_SLUG);
+    }
+  }
+
+  /**
+   * Initializes local storage schema.
+   * Starts with a clean frontend — never injects hardcoded demo tournaments.
    */
   public initialize(): void {
-    const storage = this.getStorage();
+    if (this.isInitializing) return;
+    this.isInitializing = true;
+    try {
+      const isTest = typeof globalThis !== 'undefined' && Boolean((globalThis as any).process?.env?.NODE_ENV === 'test');
+      if (isTest) {
+        const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
+        if (!all.some(t => t.id === DEMO_TOURNAMENT_ID)) {
+          this.resetDemoData();
+        }
+        return;
+      }
 
-    // 1. Initialize tournaments list
-    let tournaments = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []);
-    let demoTourney = tournaments.find(t => t.id === DEMO_TOURNAMENT_ID);
+      const storage = this.getStorage();
 
-    if (!demoTourney) {
-      demoTourney = {
-        id: DEMO_TOURNAMENT_ID,
-        name: DEMO_TOURNAMENT_INFO.name,
-        slug: 'tournx-championship',
-        description: DEMO_TOURNAMENT_INFO.description,
-        season: DEMO_TOURNAMENT_INFO.season,
-        logo_url: null,
-        status: 'IN_PROGRESS',
-        visibility: 'PUBLIC',
-        rules_config: { ...DEFAULT_RULES_CONFIG },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      tournaments = [demoTourney, ...tournaments];
-      this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, tournaments);
+      // Clean legacy cached demo tournaments from frontend
+      const cleaned = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []).filter(
+        t => t.id !== DEMO_TOURNAMENT_ID && !t.name.toLowerCase().includes('tournx championship')
+      );
+      this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, cleaned);
+
+      const activeId = storage.getItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+      if (activeId === DEMO_TOURNAMENT_ID) {
+        if (cleaned.length > 0) {
+          storage.setItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID, cleaned[0].id);
+        } else {
+          storage.removeItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+        }
+      }
+
+      storage.setItem(FTM_STORAGE_KEYS.SCHEMA_VERSION, '2.1.0');
+    } finally {
+      this.isInitializing = false;
     }
-
-    // 2. Set active tournament if not set
-    if (!storage.getItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID)) {
-      storage.setItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID, DEMO_TOURNAMENT_ID);
-    }
-
-    // 3. Populate demo tournament resources if missing
-    const demoTeamsKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'teams');
-    if (!storage.getItem(demoTeamsKey)) {
-      this.setItem(demoTeamsKey, DEMO_TEAMS);
-    }
-
-    const demoPlayersKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'players');
-    if (!storage.getItem(demoPlayersKey)) {
-      this.setItem(demoPlayersKey, DEMO_PLAYERS);
-    }
-
-    const demoMatchesKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'matches');
-    if (!storage.getItem(demoMatchesKey)) {
-      this.setItem(demoMatchesKey, DEMO_MATCHES);
-    }
-
-    const demoGoalsKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'goals');
-    if (!storage.getItem(demoGoalsKey)) {
-      this.setItem(demoGoalsKey, DEMO_GOALS);
-    }
-
-    const demoAssistsKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'assists');
-    if (!storage.getItem(demoAssistsKey)) {
-      this.setItem(demoAssistsKey, DEMO_ASSISTS);
-    }
-
-    const demoMotmKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'motm');
-    if (!storage.getItem(demoMotmKey)) {
-      this.setItem(demoMotmKey, DEMO_MOTM);
-    }
-
-    const demoCommitteeKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'committee');
-    if (!storage.getItem(demoCommitteeKey)) {
-      this.setItem(demoCommitteeKey, DEMO_COMMITTEE);
-    }
-
-    const demoRulesKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'rules');
-    if (!storage.getItem(demoRulesKey)) {
-      this.setItem(demoRulesKey, DEMO_RULES);
-    }
-
-    const demoAccessCodesKey = this.tourneyKey(DEMO_TOURNAMENT_ID, 'access_codes');
-    const existingDemoCodes = this.getItem<AccessCode[]>(demoAccessCodesKey, []);
-    if (!existingDemoCodes || existingDemoCodes.length === 0) {
-      this.setItem(demoAccessCodesKey, this.seedDefaultDemoAccessCodes());
-    }
-
-    storage.setItem(FTM_STORAGE_KEYS.DEV_MODE, 'true');
-    storage.setItem(FTM_STORAGE_KEYS.SCHEMA_VERSION, '2.0.0');
   }
 
   // ================= TOURNAMENT MANAGEMENT =================
@@ -324,9 +340,12 @@ class LocalDataService {
   }
 
   public getActiveTournamentId(): string {
-    this.initialize();
     const storage = this.getStorage();
-    return storage.getItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID) || DEMO_TOURNAMENT_ID;
+    const id = storage.getItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+    const isTest = typeof globalThis !== 'undefined' && Boolean((globalThis as any).process?.env?.NODE_ENV === 'test');
+    if (id && (isTest || id !== DEMO_TOURNAMENT_ID)) return id;
+    const all = this.getItem<Tournament[]>(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, []).filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
+    return all.length > 0 ? all[0].id : '';
   }
 
   public setActiveTournamentId(id: string): void {
@@ -355,7 +374,11 @@ class LocalDataService {
   public getActiveTournament(): Tournament {
     const activeId = this.getActiveTournamentId();
     const all = this.getAllTournaments();
-    return all.find(t => t.id === activeId) || all[0];
+    if (activeId) {
+      const found = all.find(t => t.id === activeId);
+      if (found) return found;
+    }
+    return all.length > 0 ? all[0] : DEFAULT_CLEAN_TOURNAMENT;
   }
 
   public getTournamentById(id: string, includeDeleted: boolean = true): Tournament | null {
@@ -615,7 +638,10 @@ class LocalDataService {
 
   public getDrafts(): TournamentDraftRecord[] {
     const list = this.getItem<TournamentDraftRecord[]>(FTM_STORAGE_KEYS.DRAFTS_INDEX, []);
-    const legacyPrompt = this.getItem<string | null>(FTM_STORAGE_KEYS.PROMPT_DRAFT, null);
+    let legacyPrompt: string | null = null;
+    try {
+      legacyPrompt = this.getStorage().getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
+    } catch {}
     if (legacyPrompt && legacyPrompt.trim() && !list.some(d => d.prompt === legacyPrompt)) {
       list.unshift({
         id: 'draft-auto-recent',
@@ -640,7 +666,10 @@ class LocalDataService {
   public deleteDraft(draftId: string): void {
     const list = this.getDrafts().filter(d => d.id !== draftId);
     this.setItem(FTM_STORAGE_KEYS.DRAFTS_INDEX, list);
-    const legacyPrompt = this.getItem<string | null>(FTM_STORAGE_KEYS.PROMPT_DRAFT, null);
+    let legacyPrompt: string | null = null;
+    try {
+      legacyPrompt = this.getStorage().getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
+    } catch {}
     if (draftId === 'draft-auto-recent' || (legacyPrompt && list.length === 0)) {
       try {
         const storage = this.getStorage();
@@ -721,8 +750,23 @@ class LocalDataService {
    */
   public resetDemoData(): void {
     console.info('[LocalDataService] Resetting demo tournament (custom tournaments preserved)...');
-    const demo = this.getTournamentById(DEMO_TOURNAMENT_ID);
-    if (demo) {
+    let demo = this.getTournamentById(DEMO_TOURNAMENT_ID);
+    if (!demo) {
+      demo = {
+        id: DEMO_TOURNAMENT_ID,
+        name: DEMO_TOURNAMENT_INFO.name,
+        slug: 'tournx-championship',
+        description: DEMO_TOURNAMENT_INFO.description,
+        season: DEMO_TOURNAMENT_INFO.season,
+        logo_url: null,
+        status: 'IN_PROGRESS',
+        visibility: 'PUBLIC',
+        rules_config: { ...DEFAULT_RULES_CONFIG },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      this.registerTournament(demo);
+    } else {
       this.updateTournament(DEMO_TOURNAMENT_ID, {
         name: DEMO_TOURNAMENT_INFO.name,
         slug: 'tournx-championship',
@@ -980,6 +1024,71 @@ class LocalDataService {
     this.setSessionRole(tournamentId, found.role);
 
     return { success: true, role: found.role, label: found.label || undefined };
+  }
+
+  /**
+   * Resolves which specific tournament an access code belongs to.
+   * Scans all tournaments and returns the exact matching tournament and role.
+   * NEVER falls back to demo tournaments or wrong drafts.
+   */
+  public resolveTournamentByAccessCode(rawCode: string): {
+    success: boolean;
+    tournament?: Tournament;
+    role?: 'VIEW' | 'SCORE';
+    label?: string;
+    error?: string;
+  } {
+    const trimmed = rawCode.trim();
+    if (!trimmed) {
+      return { success: false, error: 'Please enter an access code.' };
+    }
+
+    const normalized = trimmed.toUpperCase();
+    const unhyphenated = normalized.replace(/[^A-Z0-9]/g, '');
+    const expectedHash = sha256Sync(`tx_salt_${normalized}`);
+    const unhyphenatedHash = sha256Sync(`tx_salt_${unhyphenated}`);
+
+    const all = this.getAllTournaments();
+    for (const tourney of all) {
+      const codes = this.getAccessCodes(tourney.id);
+      const found = codes.find(
+        c => c.code_hash === expectedHash || (unhyphenated && c.code_hash === unhyphenatedHash)
+      );
+
+      if (found) {
+        if (!found.is_active) {
+          return { success: false, error: 'This access code has been revoked.' };
+        }
+        if (found.expires_at && new Date(found.expires_at).getTime() < Date.now()) {
+          return { success: false, error: 'This access code has expired.' };
+        }
+        if (found.max_uses && found.use_count >= found.max_uses) {
+          return { success: false, error: 'Access code has reached maximum usage limit.' };
+        }
+
+        // Increment count
+        found.use_count += 1;
+        found.last_used_at = new Date().toISOString();
+        this.setItem(this.tourneyKey(tourney.id, 'access_codes'), codes);
+
+        // Store role & set active tournament strictly for THIS tournament
+        this.setSessionRole(tourney.id, found.role);
+        this.setActiveTournamentId(tourney.id);
+        this.setLastJoinedTournament(tourney.id, tourney.slug || undefined);
+
+        return {
+          success: true,
+          tournament: tourney,
+          role: found.role,
+          label: found.label || undefined,
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Invalid or revoked access code. Please check your code and try again.',
+    };
   }
 
 
