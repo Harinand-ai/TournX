@@ -854,4 +854,78 @@ Spurs - Anirudh, Syam, Prayag, Alan, Kevin`;
       expect(action.payload.teamName).toBe('Gokulam Kerala FC');
     });
   });
+
+  describe('Priority One Master Benchmark & Conversational Squad Regression', () => {
+    it('parses the complete Kerala Champions Cup benchmark prompt with will participate and custom points', () => {
+      const prompt =
+        "I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15, 2026, at Kannur Municipal Stadium. Six teams will participate: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. We want a single round-robin format. Each team can have five starting players and two substitutes. A win gives three points, a draw gives one point and a loss gives zero points. Enable goalscorer tracking and Player of the Match, and make the tournament public to people with the tournament access code.";
+
+      const parsed = parseTournamentPrompt(prompt);
+
+      expect(parsed.name).toBe('Kerala Champions Cup');
+      expect(parsed.teams).toEqual([
+        'Kerala Blasters',
+        'Bengaluru FC',
+        'Chennaiyin FC',
+        'Mumbai City FC',
+        'FC Goa',
+        'Hyderabad FC',
+      ]);
+      expect(parsed.teamCount).toBe(6);
+      expect(parsed.format).toBe('SINGLE_ROUND_ROBIN');
+      expect(parsed.startingPlayersPerTeam).toBe(5);
+      expect(parsed.substitutesPerTeam).toBe(2);
+      expect(parsed.pointsForWin).toBe(3);
+      expect(parsed.pointsForDraw).toBe(1);
+      expect(parsed.pointsForLoss).toBe(0);
+      expect(parsed.venue).toBe('Kannur Municipal Stadium');
+      expect(parsed.startDateIso).toBe('2026-11-15');
+      expect(parsed.visibility).toBe('PUBLIC');
+      expect(parsed.features.goalscorerTracking).toBe(true);
+      expect(parsed.features.playerOfTheMatch).toBe(true);
+    });
+
+    it('parses conversational squad instructions with positions, multi-word names, and substitutes', () => {
+      const squadPrompt =
+        'Kerala Blasters are managed by Arjun Nair. Their goalkeeper is Adithyan Raj, Nikhil Das and Amal Dev play in defense, Rohan Krishna plays midfield, and Abin Thomas is the forward. Vishnu Prasad and Akhil Mohan are substitutes.';
+
+      const parsed = parseSquadPrompt(squadPrompt, ['Kerala Blasters']);
+
+      const kb = parsed.squads['Kerala Blasters'];
+      expect(kb).toBeDefined();
+      expect(kb.managerName).toBe('Arjun Nair');
+      expect(kb.players).toHaveLength(7);
+
+      const gk = kb.players.find(p => p.name === 'Adithyan Raj');
+      expect(gk?.position).toBe('GK');
+      expect(gk?.isSubstitute).toBe(false);
+
+      const def1 = kb.players.find(p => p.name === 'Nikhil Das');
+      expect(def1?.position).toBe('DEF');
+      expect(def1?.isSubstitute).toBe(false);
+
+      const def2 = kb.players.find(p => p.name === 'Amal Dev');
+      expect(def2?.position).toBe('DEF');
+      expect(def2?.isSubstitute).toBe(false);
+
+      const mid = kb.players.find(p => p.name === 'Rohan Krishna');
+      expect(mid?.position).toBe('MID');
+      expect(mid?.isSubstitute).toBe(false);
+
+      const fwd = kb.players.find(p => p.name === 'Abin Thomas');
+      expect(fwd?.position).toBe('FWD');
+      expect(fwd?.isSubstitute).toBe(false);
+
+      const sub1 = kb.players.find(p => p.name === 'Vishnu Prasad');
+      expect(sub1?.position).toBe('TBD');
+      expect(sub1?.isSubstitute).toBe(true);
+
+      const sub2 = kb.players.find(p => p.name === 'Akhil Mohan');
+      expect(sub2?.position).toBe('TBD');
+      expect(sub2?.isSubstitute).toBe(true);
+
+      // Verify manager is NOT in players
+      expect(kb.players.some(p => p.name.includes('Arjun Nair'))).toBe(false);
+    });
+  });
 });

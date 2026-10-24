@@ -12,33 +12,79 @@ import {
   UserPlus,
   Eye,
   Sliders,
-  Mail
+  Mail,
+  FileText,
+  Save,
+  BookOpen,
+  Calendar,
+  Shield
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, resendConfirmationEmail, sendPasswordResetEmail } from '../lib/supabase';
-import { localDataService } from '../services/localDataService';
+import { localDataService, FTM_STORAGE_KEYS } from '../services/localDataService';
 import { tournamentService } from '../services/tournamentService';
 import { Tournament } from '../types/multiTenant';
+import { DraftsModal } from '../components/admin/DraftsModal';
 
 interface LandingPageProps {
-  onOrganizeClick: (initialTournamentData?: { name: string; description: string; visibility: 'PUBLIC' | 'PRIVATE' }) => void;
+  onOrganizeClick: (initialTournamentData?: { name?: string; description?: string; visibility?: 'PUBLIC' | 'PRIVATE'; prompt?: string }) => void;
   onJoinTournament: (tourneySlug: string) => void;
   onOpenPublicDemo: () => void;
   activeTournament?: Tournament;
   noticeMessage?: string;
+  onOpenTutorial?: () => void;
+  isAdminLoggedIn?: boolean;
 }
+
+const EXAMPLE_PROMPTS = [
+  {
+    title: 'Kerala Champions Cup (Benchmark)',
+    prompt: "I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15, 2026, at Kannur Municipal Stadium. Six teams will participate: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. We want a single round-robin format. Each team can have five starting players and two substitutes. A win gives three points, a draw gives one point and a loss gives zero points. Enable goalscorer tracking and Player of the Match, and make the tournament public to people with the tournament access code."
+  },
+  {
+    title: 'Premier 4-Team League',
+    prompt: 'Create a 4-team football tournament with Arsenal, Chelsea, Liverpool and Tottenham. Single round-robin league starting tomorrow at 4 PM at Wembley Arena.'
+  },
+  {
+    title: '8-Team Knockout Cup',
+    prompt: '8-team single elimination football knockout cup called Metro Super Cup this Saturday 5 PM with 50 minute matches.'
+  }
+];
 
 export function LandingPage({
   onOrganizeClick,
   onJoinTournament,
   onOpenPublicDemo,
   activeTournament,
-  noticeMessage
+  noticeMessage,
+  onOpenTutorial,
+  isAdminLoggedIn = false
 }: LandingPageProps) {
   // Main Tab: 'ORGANIZE' | 'JOIN'
   const [activeAction, setActiveAction] = useState<'ORGANIZE' | 'JOIN'>('ORGANIZE');
 
-  // Organizer Auth Mode: 'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'
+  // Master Prompt Text
+  const [masterPromptText, setMasterPromptText] = useState(() => {
+    try {
+      return localStorage.getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT) || '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Drafts Modal
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+  const [draftsCount, setDraftsCount] = useState<number>(() => {
+    try {
+      return tournamentService.getDrafts().length;
+    } catch {
+      return 0;
+    }
+  });
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+
+  // Organizer Auth Mode: 'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD' | 'NONE'
   const [authMode, setAuthMode] = useState<'SIGN_IN' | 'SIGN_UP' | 'FORGOT_PASSWORD'>('SIGN_IN');
+  const [showAuthSection, setShowAuthSection] = useState(false);
 
   // Sign up / Sign in fields
   const [organizerName, setOrganizerName] = useState('');
@@ -58,6 +104,51 @@ export function LandingPage({
   const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
+
+  const refreshDraftsCount = () => {
+    try {
+      setDraftsCount(tournamentService.getDrafts().length);
+    } catch {}
+  };
+
+  const handleSaveDraft = () => {
+    if (!masterPromptText.trim()) return;
+    try {
+      const now = new Date().toISOString();
+      tournamentService.saveDraft({
+        id: `draft-${Date.now()}`,
+        name: masterPromptText.slice(0, 32).trim() + (masterPromptText.length > 32 ? '...' : ''),
+        prompt: masterPromptText.trim(),
+        teamsCount: 0,
+        format: 'Single Round-Robin',
+        status: 'DRAFT',
+        updated_at: now,
+      });
+      refreshDraftsCount();
+      setDraftNotice('Draft saved to vault successfully.');
+      setTimeout(() => setDraftNotice(null), 3000);
+    } catch {
+      setDraftNotice('Failed to save draft.');
+    }
+  };
+
+  const handleGeneratePreview = () => {
+    const prompt = masterPromptText.trim();
+    if (!prompt) return;
+
+    try {
+      localStorage.setItem(FTM_STORAGE_KEYS.PROMPT_DRAFT, prompt);
+    } catch {}
+
+    // Check if user is already authenticated
+    const hasActiveSession = isAdminLoggedIn || (isSupabaseConfigured && supabase?.auth?.getUser());
+    if (hasActiveSession || import.meta.env.DEV) {
+      onOrganizeClick({ prompt });
+    } else {
+      setShowAuthSection(true);
+      setConfirmationNotice('Prompt saved! Sign in or register to preview, generate fixtures, and publish your tournament.');
+    }
+  };
 
   // Handle Organizer Sign Up
   const handleOrganizerSignUp = async (e: React.FormEvent) => {
@@ -98,7 +189,7 @@ export function LandingPage({
         }
 
         if (data.session) {
-          onOrganizeClick();
+          onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
           return;
         } else if (data.user && !data.session) {
           if (data.user.identities && data.user.identities.length === 0) {
@@ -120,7 +211,7 @@ export function LandingPage({
 
       if (import.meta.env.DEV) {
         localDataService.setDevAdminLoggedIn(true);
-        onOrganizeClick();
+        onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
       } else {
         throw new Error('Authentication service is currently unavailable.');
       }
@@ -204,7 +295,7 @@ export function LandingPage({
         }
 
         if (data.user) {
-          onOrganizeClick();
+          onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
           return;
         }
         throw new Error('Sign in failed. No user session returned.');
@@ -212,7 +303,7 @@ export function LandingPage({
 
       if (import.meta.env.DEV) {
         localDataService.setDevAdminLoggedIn(true);
-        onOrganizeClick();
+        onOrganizeClick({ prompt: masterPromptText.trim() || undefined });
       } else {
         throw new Error('Authentication service is currently unavailable.');
       }
@@ -258,7 +349,7 @@ export function LandingPage({
       return;
     }
 
-    // 1. Check if user pasted a full URL or path (e.g. http://.../t/slug or /t/slug)
+    // 1. Check if user pasted a full URL or path
     const urlMatch = input.match(/(?:^|\/)t\/([a-zA-Z0-9_-]+)/);
     if (urlMatch && urlMatch[1]) {
       const slug = urlMatch[1];
@@ -276,7 +367,7 @@ export function LandingPage({
       return;
     }
 
-    // 3. Attempt Access Code Verification across active and registered tournaments
+    // 3. Attempt Access Code Verification
     setIsVerifyingCode(true);
     try {
       const activeTourney = activeTournament || localDataService.getActiveTournament();
@@ -303,7 +394,6 @@ export function LandingPage({
         }
       }
 
-      // If it looks like a pure tournament slug (e.g., custom user slug without code markers)
       const isPureSlugFormat = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.toLowerCase()) && 
         !input.toUpperCase().startsWith('TX-') && 
         !input.toUpperCase().includes('VIEW') && 
@@ -315,7 +405,6 @@ export function LandingPage({
         return;
       }
 
-      // Show actual failure reason
       setJoinError(verifyResult.error || 'Invalid or revoked access code. Please verify your code or link.');
     } catch (err: any) {
       setJoinError(err.message || 'Access code verification failed.');
@@ -325,36 +414,50 @@ export function LandingPage({
   };
 
   return (
-    <div className="w-full min-h-[90vh] flex flex-col justify-center items-center py-8 px-4 sm:px-6 bg-[#0a0d0b] text-[#f1f5f9] retro-dot-grid relative">
+    <div className="w-full min-h-[90vh] flex flex-col justify-center items-center py-6 px-4 sm:px-6 bg-[#0c120e] text-[#faf9f5] relative">
       
       {/* Brand Header */}
-      <div className="text-center max-w-2xl mx-auto mb-8 relative z-10">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111a14] border border-[#23352a] text-lime-400 text-xs font-mono tracking-widest uppercase mb-4 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-lime-400 animate-pulse" />
-          <span>THINK • PROMPT • ORGANISE</span>
+      <div className="text-center max-w-2xl mx-auto mb-6 relative z-10">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111f16] border border-[#1e3425] text-emerald-400 text-xs font-semibold tracking-wider uppercase mb-3 shadow-sm">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+          <span>NATURAL LANGUAGE FOOTBALL MANAGEMENT</span>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#f8fafc] mb-3">
-          Tourn<span className="text-emerald-400 font-pixel">X</span>
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#faf9f5] mb-2 font-sans">
+          Tourn<span className="text-emerald-400">X</span>
         </h1>
-        <p className="text-sm sm:text-base text-slate-400 max-w-md mx-auto font-sans leading-relaxed">
-          Professional football tournament management. Instant fixtures, live scoreboards & squad management.
+        <p className="text-sm sm:text-base text-slate-300 max-w-lg mx-auto font-sans leading-relaxed">
+          From a single sentence in plain English to official fixtures, live scoreboards, and squad management.
         </p>
+
+        {/* Tutorial Quick Access */}
+        {onOpenTutorial && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={onOpenTutorial}
+              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 bg-[#132219] hover:bg-[#182b20] border border-[#203a29] px-3 py-1.5 rounded-xl transition cursor-pointer font-medium shadow-xs"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Interactive 6-Step Tutorial</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Notice Message */}
       {noticeMessage && (
-        <div className="w-full max-w-lg mb-5 p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2.5">
+        <div className="w-full max-w-2xl mb-5 p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-amber-300 text-xs flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <span>{noticeMessage}</span>
         </div>
       )}
 
-      {/* Main Console Card */}
-      <div className="w-full max-w-lg bg-[#111827] border border-[#1f293d] rounded-2xl shadow-xl overflow-hidden relative z-10">
+      {/* Main Console Container */}
+      <div className="w-full max-w-3xl bg-[#0f1712] border border-[#1e3425] rounded-2xl shadow-2xl overflow-hidden relative z-10">
         
         {/* Navigation Tabs Strip */}
-        <div className="grid grid-cols-2 p-1.5 bg-[#0b101d] border-b border-[#1f293d]">
+        <div className="grid grid-cols-2 p-1.5 bg-[#0a110d] border-b border-[#1e3425]">
           <button
             type="button"
             onClick={() => {
@@ -363,12 +466,12 @@ export function LandingPage({
             }}
             className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
               activeAction === 'ORGANIZE'
-                ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54] shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
+                ? 'bg-[#16271c] text-emerald-400 border border-[#2b4c35] shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111d15]'
             }`}
           >
             <Trophy className="w-4 h-4 text-emerald-400" />
-            <span>Organize</span>
+            <span>Organize Tournament</span>
           </button>
 
           <button
@@ -379,58 +482,21 @@ export function LandingPage({
             }}
             className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer ${
               activeAction === 'JOIN'
-                ? 'bg-[#162032] text-emerald-400 border border-[#2b3a54] shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111827]'
+                ? 'bg-[#16271c] text-emerald-400 border border-[#2b4c35] shadow-xs'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-[#111d15]'
             }`}
           >
             <Users className="w-4 h-4 text-emerald-400" />
-            <span>Join Matchday</span>
+            <span>Join with Pass or Code</span>
           </button>
         </div>
 
         {/* Card Body */}
-        <div className="p-6 sm:p-8">
+        <div className="p-6 sm:p-8 space-y-6">
           
-          {/* Notifications */}
-          {confirmationNotice && (
-            <div className="mb-5 p-3.5 rounded-xl bg-blue-950/40 border border-blue-800/60 text-blue-300 text-xs flex items-start gap-2.5">
-              <CheckCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <span>{confirmationNotice}</span>
-            </div>
-          )}
-
-          {resendStatus && (
-            <div className="mb-5 p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
-              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>{resendStatus}</span>
-            </div>
-          )}
-
-          {errorMessage && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2.5">
-              <div className="flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                <span className="flex-1">{errorMessage}</span>
-              </div>
-              {isUnconfirmedError && (
-                <div className="pt-2 border-t border-rose-800/40 flex items-center justify-between">
-                  <span className="text-[11px] text-rose-400">Need a verification link?</span>
-                  <button
-                    type="button"
-                    onClick={handleResendConfirmation}
-                    disabled={isResending}
-                    className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
-                  >
-                    {isResending ? 'Sending...' : 'Resend Email'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
           <AnimatePresence mode="wait">
             
-            {/* ACTION 1: ORGANIZE A TOURNAMENT */}
+            {/* ACTION 1: ORGANIZE A TOURNAMENT (CENTRAL MASTER PROMPT CREATOR) */}
             {activeAction === 'ORGANIZE' && (
               <motion.div
                 key="organize-pane"
@@ -438,236 +504,354 @@ export function LandingPage({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.15 }}
+                className="space-y-6"
               >
-                {/* Sign up / Sign in Toggle */}
-                <div className="flex items-center justify-between mb-5 border-b border-[#1f293d] pb-3">
-                  <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
-                    {authMode === 'SIGN_UP' ? 'Organizer Registration' : authMode === 'FORGOT_PASSWORD' ? 'Password Recovery' : 'Organizer Sign In'}
-                  </span>
-                  
-                  <div className="flex items-center gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode('SIGN_IN');
-                        setErrorMessage(null);
-                        setConfirmationNotice(null);
-                      }}
-                      className={`font-semibold cursor-pointer transition ${
-                        authMode === 'SIGN_IN' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Sign In
-                    </button>
-                    <span className="text-slate-600">•</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthMode('SIGN_UP');
-                        setErrorMessage(null);
-                        setConfirmationNotice(null);
-                      }}
-                      className={`font-semibold cursor-pointer transition ${
-                        authMode === 'SIGN_UP' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Sign Up
-                    </button>
-                  </div>
-                </div>
-
-                {/* Form: SIGN IN */}
-                {authMode === 'SIGN_IN' && (
-                  <form onSubmit={handleOrganizerSignIn} className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-300">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        value={organizerEmail}
-                        onChange={(e) => setOrganizerEmail(e.target.value)}
-                        placeholder="organizer@club.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
+                {/* Central Master Prompt Creator */}
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-bold text-[#faf9f5] tracking-tight">
+                        Describe your tournament in natural English
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+                        Type teams, dates, venue, format, and rules. TournX extracts everything and generates your preview instantly.
+                      </p>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-semibold text-slate-300">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsDraftsModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto shrink-0"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Saved Drafts</span>
+                      {draftsCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                          {draftsCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Large Prompt Textarea */}
+                  <div className="relative">
+                    <textarea
+                      rows={5}
+                      value={masterPromptText}
+                      onChange={(e) => setMasterPromptText(e.target.value)}
+                      placeholder="e.g. I'm organising a five-a-side football tournament called Kerala Champions Cup on November 15 at Kannur Municipal Stadium. Six teams: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa and Hyderabad FC. Single round-robin format with three points for a win, one for a draw..."
+                      className="w-full px-4 py-3 rounded-xl bg-[#0a110d] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500 resize-none font-sans leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Example prompt chips */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] text-slate-400 font-medium">Click to try an example:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {EXAMPLE_PROMPTS.map((ex, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setMasterPromptText(ex.prompt)}
+                          className="px-2.5 py-1 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-slate-300 hover:text-white text-xs transition cursor-pointer text-left"
+                        >
+                          {ex.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Prompt Actions */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={!masterPromptText.trim()}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-40"
+                    >
+                      <Save className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Save as Draft</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleGeneratePreview}
+                      disabled={!masterPromptText.trim()}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2 group"
+                    >
+                      <span>Generate Preview</span>
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </button>
+                  </div>
+
+                  {draftNotice && (
+                    <p className="text-xs text-emerald-400 text-center pt-1 animate-pulse">
+                      {draftNotice}
+                    </p>
+                  )}
+                </div>
+
+                {/* Organizer Current Tournament / Direct Dashboard Link */}
+                {activeTournament && (
+                  <div className="p-4 rounded-xl bg-[#0a110d] border border-[#1e3425] flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-[#faf9f5]">
+                        Active Tournament: {activeTournament.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        {activeTournament.season || '2026'} • {activeTournament.visibility}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onOrganizeClick()}
+                      className="px-3.5 py-1.5 rounded-lg bg-[#16271c] hover:bg-[#1c3224] border border-[#2b4c35] text-xs font-semibold text-emerald-400 transition cursor-pointer"
+                    >
+                      Open Dashboard
+                    </button>
+                  </div>
+                )}
+
+                {/* Notifications */}
+                {confirmationNotice && (
+                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{confirmationNotice}</span>
+                  </div>
+                )}
+
+                {resendStatus && (
+                  <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-start gap-2.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{resendStatus}</span>
+                  </div>
+                )}
+
+                {errorMessage && (
+                  <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex flex-col gap-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                      <span className="flex-1">{errorMessage}</span>
+                    </div>
+                    {isUnconfirmedError && (
+                      <div className="pt-2 border-t border-rose-800/40 flex items-center justify-between">
+                        <span className="text-[11px] text-rose-400">Need a verification link?</span>
+                        <button
+                          type="button"
+                          onClick={handleResendConfirmation}
+                          disabled={isResending}
+                          className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition cursor-pointer disabled:opacity-50"
+                        >
+                          {isResending ? 'Sending...' : 'Resend Email'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Optional Sign In / Registration Panel */}
+                <div className="pt-4 border-t border-[#1e3425]">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs uppercase tracking-wider text-slate-400 font-medium">
+                      {showAuthSection ? (authMode === 'SIGN_UP' ? 'Organizer Registration' : authMode === 'FORGOT_PASSWORD' ? 'Password Recovery' : 'Organizer Sign In') : 'Organizer Account'}
+                    </span>
+                    
+                    {!showAuthSection ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAuthSection(true)}
+                        className="text-xs text-emerald-400 hover:underline cursor-pointer font-medium"
+                      >
+                        Sign in to manage tournament →
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
                         <button
                           type="button"
                           onClick={() => {
-                            setAuthMode('FORGOT_PASSWORD');
+                            setAuthMode('SIGN_IN');
                             setErrorMessage(null);
                             setConfirmationNotice(null);
                           }}
-                          className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                          className={`font-semibold cursor-pointer transition ${
+                            authMode === 'SIGN_IN' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
+                          }`}
                         >
-                          Forgot password?
+                          Sign In
+                        </button>
+                        <span className="text-slate-600">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthMode('SIGN_UP');
+                            setErrorMessage(null);
+                            setConfirmationNotice(null);
+                          }}
+                          className={`font-semibold cursor-pointer transition ${
+                            authMode === 'SIGN_UP' ? 'text-emerald-400 underline underline-offset-4' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Sign Up
                         </button>
                       </div>
-                      <input
-                        type="password"
-                        required
-                        value={organizerPassword}
-                        onChange={(e) => setOrganizerPassword(e.target.value)}
-                        placeholder="••••••••••••"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
-                    </div>
+                    )}
+                  </div>
 
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      ) : (
-                        <>
-                          <LogIn className="w-4 h-4" />
-                          <span>Sign In to Organizer</span>
-                          <ArrowRight className="w-4 h-4 ml-1" />
-                        </>
+                  {showAuthSection && (
+                    <div className="bg-[#0a110d] p-5 rounded-xl border border-[#1e3425]">
+                      {/* Form: SIGN IN */}
+                      {authMode === 'SIGN_IN' && (
+                        <form onSubmit={handleOrganizerSignIn} className="space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-300">Email Address</label>
+                            <input
+                              type="email"
+                              required
+                              value={organizerEmail}
+                              onChange={(e) => setOrganizerEmail(e.target.value)}
+                              placeholder="organizer@club.com"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-semibold text-slate-300">Password</label>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAuthMode('FORGOT_PASSWORD');
+                                  setErrorMessage(null);
+                                  setConfirmationNotice(null);
+                                }}
+                                className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
+                              >
+                                Forgot password?
+                              </button>
+                            </div>
+                            <input
+                              type="password"
+                              required
+                              value={organizerPassword}
+                              onChange={(e) => setOrganizerPassword(e.target.value)}
+                              placeholder="••••••••••••"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isLoading ? (
+                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            ) : (
+                              <>
+                                <LogIn className="w-4 h-4" />
+                                <span>Sign In & Continue</span>
+                                <ArrowRight className="w-4 h-4 ml-1" />
+                              </>
+                            )}
+                          </button>
+                        </form>
                       )}
-                    </button>
 
-                    <div className="text-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('SIGN_UP');
-                          setErrorMessage(null);
-                          setConfirmationNotice(null);
-                        }}
-                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
-                      >
-                        Don't have an account? <span className="font-semibold text-emerald-400">Sign Up</span>
-                      </button>
-                    </div>
-                  </form>
-                )}
+                      {/* Form: SIGN UP */}
+                      {authMode === 'SIGN_UP' && (
+                        <form onSubmit={handleOrganizerSignUp} className="space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-300">Organizer Name (Optional)</label>
+                            <input
+                              type="text"
+                              value={organizerName}
+                              onChange={(e) => setOrganizerName(e.target.value)}
+                              placeholder="e.g. Alex Ferguson"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
 
-                {/* Form: SIGN UP */}
-                {authMode === 'SIGN_UP' && (
-                  <form onSubmit={handleOrganizerSignUp} className="space-y-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-300">Organizer Name (Optional)</label>
-                      <input
-                        type="text"
-                        value={organizerName}
-                        onChange={(e) => setOrganizerName(e.target.value)}
-                        placeholder="e.g. Alex Ferguson"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
-                    </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-300">Email Address *</label>
+                            <input
+                              type="email"
+                              required
+                              value={organizerEmail}
+                              onChange={(e) => setOrganizerEmail(e.target.value)}
+                              placeholder="organizer@club.com"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-300">Email Address *</label>
-                      <input
-                        type="email"
-                        required
-                        value={organizerEmail}
-                        onChange={(e) => setOrganizerEmail(e.target.value)}
-                        placeholder="organizer@club.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
-                    </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-300">Password *</label>
+                            <input
+                              type="password"
+                              required
+                              value={organizerPassword}
+                              onChange={(e) => setOrganizerPassword(e.target.value)}
+                              placeholder="At least 6 characters"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-300">Password *</label>
-                      <input
-                        type="password"
-                        required
-                        value={organizerPassword}
-                        onChange={(e) => setOrganizerPassword(e.target.value)}
-                        placeholder="At least 6 characters"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4" />
-                          <span>Create Organizer Account</span>
-                          <ArrowRight className="w-4 h-4 ml-1" />
-                        </>
+                          <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isLoading ? (
+                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            ) : (
+                              <>
+                                <UserPlus className="w-4 h-4" />
+                                <span>Create Organizer Account</span>
+                                <ArrowRight className="w-4 h-4 ml-1" />
+                              </>
+                            )}
+                          </button>
+                        </form>
                       )}
-                    </button>
 
-                    <div className="text-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('SIGN_IN');
-                          setErrorMessage(null);
-                          setConfirmationNotice(null);
-                        }}
-                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
-                      >
-                        Already have an account? <span className="font-semibold text-emerald-400">Sign In</span>
-                      </button>
-                    </div>
-                  </form>
-                )}
+                      {/* Form: FORGOT PASSWORD */}
+                      {authMode === 'FORGOT_PASSWORD' && (
+                        <form onSubmit={handlePasswordReset} className="space-y-4">
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Enter the email address associated with your organizer account to receive a reset link.
+                          </p>
 
-                {/* Form: FORGOT PASSWORD */}
-                {authMode === 'FORGOT_PASSWORD' && (
-                  <form onSubmit={handlePasswordReset} className="space-y-4">
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Enter the email address associated with your organizer account, and we will send you a link to reset your password.
-                    </p>
+                          <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-300">Email Address</label>
+                            <input
+                              type="email"
+                              required
+                              value={organizerEmail}
+                              onChange={(e) => setOrganizerEmail(e.target.value)}
+                              placeholder="organizer@club.com"
+                              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0f1712] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
+                            />
+                          </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-300">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        value={organizerEmail}
-                        onChange={(e) => setOrganizerEmail(e.target.value)}
-                        placeholder="organizer@club.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition placeholder:text-slate-500"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      ) : (
-                        <>
-                          <Mail className="w-4 h-4" />
-                          <span>Send Reset Link</span>
-                          <ArrowRight className="w-4 h-4 ml-1" />
-                        </>
+                          <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full mt-3 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isLoading ? (
+                              <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            ) : (
+                              <>
+                                <Mail className="w-4 h-4" />
+                                <span>Send Reset Link</span>
+                                <ArrowRight className="w-4 h-4 ml-1" />
+                              </>
+                            )}
+                          </button>
+                        </form>
                       )}
-                    </button>
-
-                    <div className="text-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('SIGN_IN');
-                          setErrorMessage(null);
-                          setConfirmationNotice(null);
-                        }}
-                        className="text-xs text-slate-400 hover:text-emerald-400 transition cursor-pointer"
-                      >
-                        Return to <span className="font-semibold text-emerald-400">Sign In</span>
-                      </button>
                     </div>
-                  </form>
-                )}
+                  )}
+                </div>
               </motion.div>
             )}
 
@@ -682,8 +866,9 @@ export function LandingPage({
                 className="space-y-5"
               >
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
-                    Enter an access code, matchday pass, or tournament slug to view live fixtures and standings.
+                  <h2 className="text-lg font-bold text-[#faf9f5]">Enter Tournament Access Code</h2>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Enter an access code, matchday pass, or tournament link to view live fixtures and standings.
                   </p>
                 </div>
 
@@ -713,14 +898,14 @@ export function LandingPage({
                         value={joinCodeOrLink}
                         onChange={(e) => setJoinCodeOrLink(e.target.value)}
                         placeholder="e.g. TX-VIEW-9876 or tournx-championship"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b1120] border border-[#222f46] text-[#f8fafc] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition pl-10 font-mono placeholder:text-slate-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#0a110d] border border-[#1e3425] text-[#faf9f5] text-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition pl-10 font-mono placeholder:text-slate-500"
                       />
                       <Key className="w-4 h-4 text-emerald-400/80 absolute left-3.5 top-3" />
                     </div>
                   </div>
 
-                  {/* Built-in Demo Passes One-Click Helper */}
-                  <div className="p-3.5 rounded-xl bg-[#0b1120] border border-[#1f293d] space-y-2">
+                  {/* Built-in Demo Passes Helper */}
+                  <div className="p-3.5 rounded-xl bg-[#0a110d] border border-[#1e3425] space-y-2">
                     <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
                       Demo Tournament Passes:
                     </div>
@@ -731,7 +916,7 @@ export function LandingPage({
                           setJoinCodeOrLink('TX-VIEW-9876');
                           setJoinError(null);
                         }}
-                        className="py-2 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-left transition cursor-pointer group"
+                        className="py-2 px-3 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-left transition cursor-pointer group"
                       >
                         <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
                           <Eye className="w-3.5 h-3.5" />
@@ -746,7 +931,7 @@ export function LandingPage({
                           setJoinCodeOrLink('TX-SCORE-9876');
                           setJoinError(null);
                         }}
-                        className="py-2 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-left transition cursor-pointer group"
+                        className="py-2 px-3 rounded-lg bg-[#111f16] hover:bg-[#16271c] border border-[#1e3425] text-left transition cursor-pointer group"
                       >
                         <div className="flex items-center gap-1.5 text-emerald-400 font-mono text-xs font-bold">
                           <Sliders className="w-3.5 h-3.5" />
@@ -774,8 +959,8 @@ export function LandingPage({
                 </form>
 
                 {/* Instant Public Showcase Card */}
-                <div className="mt-6 pt-5 border-t border-[#1f293d]">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0b1120] border border-[#1f293d]">
+                <div className="mt-6 pt-5 border-t border-[#1e3425]">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#0a110d] border border-[#1e3425]">
                     <div className="min-w-0 pr-2">
                       <div className="text-xs font-bold text-slate-200 truncate">
                         {activeTournament?.name || 'TournX Championship'}
@@ -787,7 +972,7 @@ export function LandingPage({
                     <button
                       type="button"
                       onClick={onOpenPublicDemo}
-                      className="shrink-0 py-1.5 px-3 rounded-lg bg-[#162032] hover:bg-[#1e2c44] border border-[#2b3a54] text-xs font-semibold text-emerald-400 transition cursor-pointer"
+                      className="shrink-0 py-1.5 px-3 rounded-lg bg-[#132219] hover:bg-[#182b20] border border-[#203a29] text-xs font-semibold text-emerald-400 transition cursor-pointer"
                     >
                       View Live Scoreboard
                     </button>
@@ -801,8 +986,19 @@ export function LandingPage({
         </div>
       </div>
 
+      {/* Drafts Modal */}
+      <DraftsModal
+        isOpen={isDraftsModalOpen}
+        onClose={() => setIsDraftsModalOpen(false)}
+        onSelectDraft={(draft) => {
+          setMasterPromptText(draft.prompt);
+          setIsDraftsModalOpen(false);
+        }}
+        onDraftsChanged={refreshDraftsCount}
+      />
+
       {/* Clean Professional Footer */}
-      <div className="mt-8 text-center text-xs text-slate-500 tracking-wide font-sans">
+      <div className="mt-8 text-center text-xs text-slate-400 tracking-wide font-sans">
         TournX • Professional Sports Management • Real-time Sync & Isolated Tenancy
       </div>
 

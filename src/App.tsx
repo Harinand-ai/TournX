@@ -37,6 +37,7 @@ import { LiveMatchModal } from './components/LiveMatchModal';
 import { TournamentSwitcherModal } from './components/TournamentSwitcherModal';
 import { CreateTournamentModal } from './components/CreateTournamentModal';
 import { AccessCodeModal } from './components/AccessCodeModal';
+import { InteractiveTutorialModal } from './components/InteractiveTutorialModal';
 import { Analytics } from '@vercel/analytics/react';
 import { Trophy, Plus, RefreshCw } from 'lucide-react';
 
@@ -141,6 +142,7 @@ export function App() {
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [isLiveWindowOpen, setIsLiveWindowOpen] = useState(false);
 
@@ -631,6 +633,8 @@ export function App() {
         return (
           <LandingPage
             activeTournament={activeTournament}
+            isAdminLoggedIn={isAdminLoggedIn}
+            onOpenTutorial={() => setIsTutorialOpen(true)}
             onOrganizeClick={(initialTourney) => {
               if (initialTourney) {
                 setWizardInitialData(initialTourney);
@@ -757,13 +761,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0d0b] text-[#f1f5f9] font-sans selection:bg-lime-500 selection:text-black retro-dot-grid relative overflow-x-hidden">
-      
-      {/* Animated 3D Retro Perspective Grid Background */}
-      <div className="retro-perspective-grid-container" aria-hidden="true">
-        <div className="retro-horizon-glow" />
-        <div className="retro-perspective-grid" />
-      </div>
+    <div className="min-h-screen flex flex-col bg-[#0c120e] text-[#faf9f5] font-sans selection:bg-emerald-900 selection:text-emerald-200 relative overflow-x-hidden">
 
       {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (
@@ -780,6 +778,7 @@ export function App() {
         activeTournamentName={activeTournament?.name}
         onOpenTournamentSwitcher={() => setIsSwitcherOpen(true)}
         onOpenAccessCode={() => setIsAccessModalOpen(true)}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
         sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
       />
 
@@ -856,6 +855,17 @@ export function App() {
       <LiveMatchModal
         isOpen={isLiveWindowOpen}
         onClose={() => setIsLiveWindowOpen(false)}
+      />
+
+      {/* Interactive 6-Step Guided Tutorial Modal */}
+      <InteractiveTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={() => setIsTutorialOpen(false)}
+        onTryPrompt={(p) => {
+          setIsTutorialOpen(false);
+          setWizardInitialData({ prompt: p });
+          handleNavigate('organize');
+        }}
       />
 
       {/* Vercel Web Analytics */}

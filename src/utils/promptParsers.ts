@@ -878,17 +878,17 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
     const teamSectionPatterns = [
       // Pattern 1: e.g. "teamnames crystal apalce,fulham,dotmund and spurs at college ground..." or "team names are A, B, C and D"
       /(?:\bteamnames?\b|\bteam\s+names?\s*(?:are|include|:))\s*:?\s*([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
-      // Pattern 2: e.g. "Four teams: Crystal Palace, Fulham, Dortmund and Spurs." or "I have 4 teams: Red, Blue, Green and Yellow. Arrange a football tournament"
-      /(?:(?:(?:have|got)\s+)?(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\s*:\s*)([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
+      // Pattern 2: e.g. "Four teams: Crystal Palace, Fulham, Dortmund and Spurs." or "Six teams will participate: ..."
+      /(?:(?:(?:have|got)\s+)?(?:two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\s*(?:will\s+participate|are\s+participating|participating|take\s+part|playing)?\s*:\s*)([^.]+?)(?=\s+at\s+[a-z0-9\s'-]+(?:stadium|ground|turf|arena|complex|park|field|pitch)|\s+at\s+\d|\s+on\s+[a-z0-9]|\s+starting|\s+starts|\s+held|\s+play\s+at|[.;!?\n]|$)/i,
       // Pattern 3: e.g. "create a knockout tournament for these teams: A, B, C, D" or "for these teams: ..."
       /(?:for\s+(?:these|the)?\s*teams?\s*:?\s*)([^.]+?)(?=\s+at|\s+on|\s+starting|\s+starts|[.;!?\n]|$)/i,
       // Pattern 4: e.g. "make a tournament with Arsenal, Chelsea, Liverpool and Spurs" or "tournament for/between A, B, C and D"
       /(?:(?:make|arrange|create|organize|organise|start|build|set\s*up)\s+(?:a\s+)?(?:football\s+)?(?:tournament|league|cup|event|bracket)\s+(?:called\s+[^.]+?\s+)?(?:with|for|between)\s+)(?!(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fourteen|sixteen|\d+)\s+teams?\b)([^.]+?)(?=\s+at|\s+on|\s+starting|\s+starts|[.;!?\n]|$)/i,
       // Pattern 4b: e.g. "create a double elimination bracket for Red, Blue, Green, Yellow"
       /(?:(?:bracket|tournament|cup|league)\s+(?:for\s+(?:these\s+)?(?:teams?\s*:?\s*)?|with\s+(?:teams?\s*:?\s*)?|between\s+(?:teams?\s*:?\s*)?))(?!\d+\s+teams?\b)([^.]+?)(?=\s+at|\s+on|[.;!?\n]|$)/i,
-      // Pattern 5: Standard conversational sentence e.g. "Six teams are participating: ..." or "teams are: ..." or "teams are a, b, c, d, make tournament"
-      /(?:\b(?:teams?|clubs?|squads?|participants?)\b)\s*(?:are\s+participating|participating\s+are|are|include|namely|:|-|—)\s*:?\s*([^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$)|(?:\s+players?\s+(?:are|include|:))|[.;!?\n]|$)/i,
-      /(?:we\s+have|featuring)\s+([A-Z][^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|$))/i,
+      // Pattern 5: Standard conversational sentence e.g. "Six teams will participate: ..." or "Six teams are participating: ..." or "teams are: ..."
+      /(?:\b(?:teams?|clubs?|squads?|participants?)\b)\s*(?:will\s+participate|are\s+participating|participating\s+are|participating|will\s+take\s+part|take\s+part|will\s+play|are|include|namely|:|-|—)\s*:?\s*([^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|We|$)|(?:\s+players?\s+(?:are|include|:))|[.;!?\n]|$)/i,
+      /(?:we\s+have|featuring)\s+([A-Z][^.]+?)(?=\.\s*(?:It|Each|Please|Use|Matches|The|Format|Schedule|We|$))/i,
     ];
 
     for (const pat of teamSectionPatterns) {
@@ -1099,8 +1099,10 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   let pointsForLoss = 0;
 
   // Win
-  const winMatch = lower.match(/(\d+|one|two|three|four|five)\s+(?:points?|pts?)\s+(?:for\s+a\s+win|per\s+win|for\s+win|win)/i) ||
-                   lower.match(/(?:win\s+(?:is\s+)?|three\s+points\s+for\s+a\s+win)/i);
+  const winMatch = 
+    lower.match(/(?:a\s+)?win\s+(?:gives?|awards?|earns?|is)\s+(\d+|one|two|three|four|five)\s+points?/i) ||
+    lower.match(/(\d+|one|two|three|four|five)\s+(?:points?|pts?)\s+(?:for\s+a\s+win|per\s+win|for\s+win|win)/i) ||
+    lower.match(/(?:win\s+(?:is\s+)?|three\s+points\s+for\s+a\s+win)/i);
   if (winMatch) {
     if (winMatch[1]) {
       const wVal = parseNumberWordOrDigits(winMatch[1]);
@@ -1111,8 +1113,10 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   }
 
   // Draw
-  const drawMatch = lower.match(/(\d+|one|two|three|none|zero)\s+(?:points?|pts?)\s+(?:for\s+a\s+draw|per\s+draw|for\s+draw|draw)/i) ||
-                    lower.match(/(?:one\s+for\s+a\s+draw|1\s+for\s+a\s+draw)/i);
+  const drawMatch = 
+    lower.match(/(?:a\s+)?draw\s+(?:gives?|awards?|earns?|is)\s+(\d+|one|two|three|none|zero)\s+points?/i) ||
+    lower.match(/(\d+|one|two|three|none|zero)\s+(?:points?|pts?)\s+(?:for\s+a\s+draw|per\s+draw|for\s+draw|draw)/i) ||
+    lower.match(/(?:one\s+for\s+a\s+draw|1\s+for\s+a\s+draw)/i);
   if (drawMatch) {
     if (drawMatch[1]) {
       const dVal = parseNumberWordOrDigits(drawMatch[1]);
@@ -1123,8 +1127,10 @@ export function parseTournamentPrompt(promptText: string): ParsedTournamentDraft
   }
 
   // Loss
-  const lossMatch = lower.match(/(\d+|none|zero|no|nil)\s+(?:points?|pts?)\s+(?:for\s+a\s+loss|for\s+loss|loss)/i) ||
-                    lower.match(/(?:none\s+for\s+a\s+loss|zero\s+for\s+a\s+loss|0\s+for\s+a\s+loss)/i);
+  const lossMatch = 
+    lower.match(/(?:a\s+)?loss\s+(?:gives?|awards?|earns?|is)\s+(\d+|none|zero|no|nil)\s+points?/i) ||
+    lower.match(/(\d+|none|zero|no|nil)\s+(?:points?|pts?)\s+(?:for\s+a\s+loss|for\s+loss|loss)/i) ||
+    lower.match(/(?:none\s+for\s+a\s+loss|zero\s+for\s+a\s+loss|0\s+for\s+a\s+loss)/i);
   if (lossMatch) {
     if (lossMatch[1]) {
       const lVal = parseNumberWordOrDigits(lossMatch[1]);
@@ -1365,6 +1371,7 @@ export interface ParsedPlayerItem {
   position: Position;
   jerseyNumber?: number;
   isCaptain: boolean;
+  isSubstitute?: boolean;
 }
 
 export interface ParsedTeamSquad {
@@ -1437,7 +1444,13 @@ export function normalizePlayerName(rawName: string): string {
   name = name.replace(/[\s—–\-*•:,.;#]+$/u, '').trim();
 
   // Strip leading articles or keywords
-  name = name.replace(/^(?:the\s+|captain\s+|player\s+)/i, '').trim();
+  name = name.replace(/^(?:the\s+|their\s+|a\s+|an\s+|our\s+|captain\s+|player\s+|substitute\s+|sub\s+)/i, '').trim();
+
+  // Strip trailing role or verb phrases if present (e.g. "Abin Thomas is the forward" or "Akhil Mohan are substitutes")
+  name = name.replace(/\s+(?:is\s+the|are\s+the|is\s+a|are\s+a|plays?\s+in|plays?|play|are|is)\s*(?:forward|striker|defender|midfielder|goalkeeper|substitutes?|subs?|defence|defense|midfield|attack)?$/i, '').trim();
+  name = name.replace(/\s+(?:are\s+substitutes?|are\s+subs?|is\s+substitute|substitutes?|subs?)$/i, '').trim();
+  name = name.replace(/\s+play\s+(?:in\s+)?(?:defense|defence|midfield|attack|forward|goal)$/i, '').trim();
+  name = name.replace(/\s+plays\s+(?:in\s+)?(?:defense|defence|midfield|attack|forward|goal)$/i, '').trim();
 
   // Collapse internal multiple whitespace
   name = name.replace(/\s+/g, ' ');
@@ -1620,6 +1633,13 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
       while ((tpm = teamPlayersRegex.exec(text)) !== null) {
         addOccurrence(canonical, tpm.index, tpm[0].length);
       }
+
+      // Direct sentence-start pattern: e.g. "Kerala Blasters are managed by...", "Kerala Blasters is coached by...", "Kerala Blasters have..."
+      const sentenceRegex = new RegExp(`(?:^|\\n|[.;]\\s*)(${escaped})(?:\\s+(?:are|is|have|has)\\b|[.,;:\\s\\n]|$)`, 'gi');
+      let sm: RegExpExecArray | null;
+      while ((sm = sentenceRegex.exec(text)) !== null) {
+        addOccurrence(canonical, sm.index, sm[0].length);
+      }
     });
   }
 
@@ -1673,13 +1693,21 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
     }
   }
 
-  // Conversational "Team Alpha is managed by...", "Team Alpha has...", "Team Alpha:"
-  const teamPrefixRegex = /(?:^|\n|[.;]\s*)(?:Team\s+)([A-Za-z0-9\s'-]{1,30}?)(?=\s+(?:is\s+managed\s+by|is\s+coached\s+by|is\s+|has\s+|players\s+are|roster\s+is|manager\s+is|squad\s+is)|:|,|\.|\n)/gi;
+  // Conversational "Team Alpha is managed by...", "Kerala Blasters are managed by..."
+  const teamPrefixRegex = /(?:^|\n|[.;]\s*)(?:(Team|Club)\s+([A-Za-z0-9\s'-]{2,30}?)|([A-Za-z0-9\s'-]{2,30}?))(?=\s+(?:is\s+managed\s+by|are\s+managed\s+by|is\s+coached\s+by|are\s+coached\s+by|manager\s+is|coach\s+is|players\s+are|squad\s+is|roster\s+is)|:)/gi;
   let tm: RegExpExecArray | null;
   while ((tm = teamPrefixRegex.exec(text)) !== null) {
-    const rawName = tm[1].trim();
-    const fullName = `Team ${rawName}`;
+    const isExplicitPrefix = Boolean(tm[1]);
+    const rawName = (tm[2] || tm[3] || '').trim();
+    if (!rawName || isInstructionLine(rawName)) continue;
+    if (/^(?:their|the|our|his|her|this|that|its|team|club|players?|squad|roster|all|both|each)\b/i.test(rawName)) continue;
+    if (/^(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|substitute|sub|subs|players?|squad|roster)$/i.test(rawName)) continue;
+
+    const fullName = isExplicitPrefix ? `${tm[1]} ${rawName}` : rawName;
     const matched = matchKnownTeam(fullName, knownTeams) || matchKnownTeam(rawName, knownTeams);
+    if (knownTeams.length > 0 && !matched) {
+      continue;
+    }
     const targetName = matched || normalizeTeamName(fullName);
     addOccurrence(targetName, tm.index, tm[0].length);
   }
@@ -1958,16 +1986,17 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
   // Strip trailing tournament instructions like "Match each player...", "Use a knockout format...", "Preserve existing data..."
   body = body.replace(/(?:\n|\.\s+)\s*(?:Match\s+each\s+|Preserve\s+|Save\s+the\s+|Flag\s+any\s+|Show\s+a\s+|Do\s+not\s+|Use\s+a\s+|Please\s+|Let\s+me\s+|Format\s+is|Schedule\s+is|Matches\s+are|The\s+event|All\s+matches|Each\s+team)[\s\S]*$/i, '.');
 
-  // 1. Extract manager if explicitly declared (e.g. "Manager: Arjun Nair", "is managed by Rahul Menon", "coach: Sameer")
+  // 1. Extract manager if explicitly declared (e.g. "Manager: Arjun Nair", "is managed by Rahul Menon", "are managed by Arjun Nair", "coach: Sameer")
   const managerMatch = 
-    body.match(/(?:(?:is\s+)?(?:managed|coached)\s+by|(?:the\s+)?(?:team\s+)?(?:manager|coach)|manager|coach)\s*(?:is|named|called|=|:)?\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|\s+and|\s+Its|\s+His|\s+Her|\s+Their|\s+Make|$)/i) ||
+    body.match(/(?:(?:is|are)\s+)?(?:managed|coached)\s+by\s+([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|\s+and|\s+Its|\s+His|\s+Her|\s+Their|\s+Make|$)/i) ||
+    body.match(/(?:(?:the\s+)?(?:team\s+)?(?:manager|coach)|manager|coach)\s*(?:is|named|called|=|:)?\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|\s+and|\s+Its|\s+His|\s+Her|\s+Their|\s+Make|$)/i) ||
     body.match(/(?:manager|coach)\s*[:\-–—]\s*([A-Za-z0-9\s'.-]{2,35}?)(?:\.|\n|,|$)/i);
   if (managerMatch && managerMatch[1]) {
     const rawMgr = managerMatch[1].trim().replace(/^[—–\-*•:,.;\s]+|[—–\-*•:,.;\s]+$/g, '');
     if (
       rawMgr &&
       rawMgr.length >= 2 &&
-      !/^(?:is|none|tbd|the|n\/a|na|nil|null|unassigned|no|not\s+assigned|no\s+manager|no\s+coach)$/i.test(rawMgr) &&
+      !/^(?:is|are|none|tbd|the|n\/a|na|nil|null|unassigned|no|not\s+assigned|no\s+manager|no\s+coach)$/i.test(rawMgr) &&
       !isInstructionLine(rawMgr) &&
       !isKnownOrAliasedTeam(rawMgr, knownTeams)
     ) {
@@ -1994,15 +2023,117 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
   }
 
   // 3. Remove manager and captain sentences before extracting player tokens
-  const sanitizedBody = body
+  let sanitizedBody = body
     .replace(/(?:manager|coach)\s*[:\-–—][^\n]*/gi, ' ')
-    .replace(/(?:is\s+)?(?:managed|coached)\s+by[^.\n]*(?:\.|\n|$|,)?/gi, ' ')
+    .replace(/(?:(?:is|are)\s+)?(?:managed|coached)\s+by[^.\n]*(?:\.|\n|$|,)?/gi, ' ')
     .replace(/(?:(?:the\s+)?(?:team\s+)?(?:manager|coach))[^\n]*(?:\.|\n|$|,)?/gi, ' ')
     .replace(/(?:make|appoint|set)[^.\n]*captain[^.\n]*(?:\.|\n|$)/gi, ' ')
     .replace(/captain\s+is[^.\n]*(?:\.|\n|$)/gi, ' ')
     .replace(/(?:its\s+players\s+are|the\s+players\s+are|players\s+are|players\s+include|players:|squad:|roster:)/gi, ' ');
 
-  // 4. Split into candidate tokens: handle multiline bulleted lists vs conversational commas
+  // Helper to safely add players to squad
+  const addPlayerToSquad = (player: ParsedPlayerItem | null) => {
+    if (!player || !player.name) return;
+    if (squad.managerName && player.name.toLowerCase() === squad.managerName.toLowerCase()) {
+      return; // Never add manager as player!
+    }
+    if (generalCaptainName) {
+      const pNorm = player.name.toLowerCase().trim();
+      if (pNorm === generalCaptainName || pNorm.split(/\s+/).includes(generalCaptainName)) {
+        player.isCaptain = true;
+      }
+    }
+    if (squad.players.some(p => p.name.toLowerCase() === player.name.toLowerCase())) {
+      warnings.push(`Duplicate player "${player.name}" ignored for ${squad.teamName}.`);
+      return;
+    }
+    squad.players.push(player);
+  };
+
+  const splitNamesList = (raw: string): string[] => {
+    return raw
+      .split(/,|;|\band\b|&/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !isInstructionLine(s) && !/^(?:and|the|their|our)$/i.test(s));
+  };
+
+  // 4. Conversational English Extraction (Prior to naive tokenization)
+  // 4A. Goalkeeper clause: e.g. "Their goalkeeper is Adithyan Raj", "The keeper is Adithyan Raj (captain)"
+  const gkRegex = /(?:(?:their|the|our)\s+)?(?:goalkeepers?|keepers?|goalies?)\s+(?:is|:)\s+([^,.;\n]+)/gi;
+  let gkm: RegExpExecArray | null;
+  while ((gkm = gkRegex.exec(sanitizedBody)) !== null) {
+    const rawNames = gkm[1];
+    splitNamesList(rawNames).forEach(raw => {
+      const p = parsePlayerToken(raw, generalCaptainName, knownTeams);
+      if (p) {
+        p.position = 'GK';
+        p.isSubstitute = false;
+        addPlayerToSquad(p);
+      }
+    });
+    sanitizedBody = sanitizedBody.substring(0, gkm.index) + ' '.repeat(gkm[0].length) + sanitizedBody.substring(gkm.index + gkm[0].length);
+  }
+
+  // 4B. Verb phrases: e.g. "Nikhil Das and Amal Dev play in defense", "Rohan Krishna plays midfield"
+  const verbRegex = /(?:playing\s+(?:in\s+)?(defence|defense|midfield|attack|forward|goal)\s+(?:are|is)\s+([^.;\n]+)|([^,.;\n]+?(?:\s+and\s+[^,.;\n]+)?)\s+(?:play|plays|playing)\s+(?:in\s+)?(defence|defense|midfield|attack|forward|goal))\b/gi;
+  let vm: RegExpExecArray | null;
+  while ((vm = verbRegex.exec(sanitizedBody)) !== null) {
+    const roleWord = (vm[1] || vm[4] || '').toLowerCase();
+    const rawNames = vm[2] || vm[3] || '';
+    let pos: Position = 'MID';
+    if (roleWord.includes('def')) pos = 'DEF';
+    else if (roleWord.includes('mid')) pos = 'MID';
+    else if (roleWord.includes('att') || roleWord.includes('fwd') || roleWord.includes('forward')) pos = 'FWD';
+    else if (roleWord.includes('goal')) pos = 'GK';
+
+    splitNamesList(rawNames).forEach(raw => {
+      const p = parsePlayerToken(raw, generalCaptainName, knownTeams);
+      if (p) {
+        p.position = pos;
+        p.isSubstitute = false;
+        addPlayerToSquad(p);
+      }
+    });
+    sanitizedBody = sanitizedBody.substring(0, vm.index) + ' '.repeat(vm[0].length) + sanitizedBody.substring(vm.index + vm[0].length);
+  }
+
+  // 4C. Noun phrases: e.g. "Abin Thomas is the forward", "Adil is a striker"
+  const nounRegex = /(?:([^,.;\n]+?)\s+(?:is|are)\s+(?:the\s+|a\s+|our\s+)?(goalkeeper|keeper|goalie|defender|midfielder|forward|striker))\b/gi;
+  let nm: RegExpExecArray | null;
+  while ((nm = nounRegex.exec(sanitizedBody)) !== null) {
+    const rawNames = nm[1];
+    const roleWord = nm[2].toLowerCase();
+    let pos: Position = 'MID';
+    if (POSITION_MAP[roleWord]) pos = POSITION_MAP[roleWord];
+
+    splitNamesList(rawNames).forEach(raw => {
+      const p = parsePlayerToken(raw, generalCaptainName, knownTeams);
+      if (p) {
+        p.position = pos;
+        p.isSubstitute = false;
+        addPlayerToSquad(p);
+      }
+    });
+    sanitizedBody = sanitizedBody.substring(0, nm.index) + ' '.repeat(nm[0].length) + sanitizedBody.substring(nm.index + nm[0].length);
+  }
+
+  // 4D. Substitutes: e.g. "Vishnu Prasad and Akhil Mohan are substitutes", "Substitutes are Vishnu Prasad and Akhil Mohan"
+  const subRegex = /(?:(?:their|the|our)\s+)?(?:substitutes?|subs?|bench)\s+(?:are|include|:)\s+([^.;\n]+?)(?=[.;]|$)|(?:([^,.;\n]+?(?:\s+and\s+[^,.;\n]+)?)\s+(?:are|as)\s+(?:the\s+)?(?:substitutes?|subs?|on the bench))\b/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = subRegex.exec(sanitizedBody)) !== null) {
+    const rawNames = sm[1] || sm[2] || '';
+    splitNamesList(rawNames).forEach(raw => {
+      const p = parsePlayerToken(raw, generalCaptainName, knownTeams);
+      if (p) {
+        p.position = 'TBD';
+        p.isSubstitute = true;
+        addPlayerToSquad(p);
+      }
+    });
+    sanitizedBody = sanitizedBody.substring(0, sm.index) + ' '.repeat(sm[0].length) + sanitizedBody.substring(sm.index + sm[0].length);
+  }
+
+  // 5. Split into candidate tokens: handle multiline bulleted lists vs conversational commas
   const candidateTokens: string[] = [];
   const lines = sanitizedBody.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
@@ -2035,17 +2166,10 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
     candidateTokens.push(...splitTokens);
   });
 
-  // 5. Parse each candidate token into a player item
+  // 6. Parse each remaining candidate token into a player item
   candidateTokens.forEach(rawToken => {
     const playerItem = parsePlayerToken(rawToken, generalCaptainName, knownTeams);
-    if (!playerItem) return;
-
-    if (squad.players.some(p => p.name.toLowerCase() === playerItem.name.toLowerCase())) {
-      warnings.push(`Duplicate player "${playerItem.name}" ignored for ${squad.teamName}.`);
-      return;
-    }
-
-    squad.players.push(playerItem);
+    addPlayerToSquad(playerItem);
   });
 }
 

@@ -6,13 +6,13 @@
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
-    background-color: #090d16;
-    color: #f8fafc;
+    background-color: #0c120e;
+    color: #faf9f5;
   }
 
   body {
-    background-color: #090d16 !important;
-    color: #f8fafc !important;
+    background-color: #0c120e !important;
+    color: #faf9f5 !important;
     min-height: 100vh;
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     selection-background-color: rgba(16, 185, 129, 0.25);
@@ -20,7 +20,7 @@
   }
 
   ::placeholder {
-    color: #64748b;
+    color: #6d8073;
     opacity: 1;
   }
 
@@ -35,177 +35,97 @@
 
 /* ==========================================================================
    TOURNX PROFESSIONAL SPORTS MANAGEMENT DESIGN SYSTEM
-   Dark Navy/Charcoal + Emerald Accent + Clean Surfaces
+   Deep Forest Green + Warm White/Ivory + Charcoal/Near-Black
    ========================================================================== */
 
-.font-pixel {
-  font-family: 'Silkscreen', monospace;
-  letter-spacing: 0.03em;
-}
-
+/* Modern Typography - Clean Sans Overrides */
+.font-pixel,
 .font-pixel-score {
-  font-family: 'Press Start 2P', monospace;
-  letter-spacing: 0.05em;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
+  letter-spacing: -0.01em;
 }
 
-/* Scanline / Texture (Subtle background accent) */
-.retro-scanlines {
-  background-image: 
-    linear-gradient(rgba(18, 26, 38, 0) 50%, rgba(0, 0, 0, 0.18) 50%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.01), transparent 50%);
-  background-size: 100% 3px, 6px 100%;
-}
-
-.retro-dot-grid {
-  background-image: radial-gradient(rgba(16, 185, 129, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
-
-/* Subtle Perspective Grid in Landing Background */
-.retro-perspective-grid-container {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 52vh;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-  perspective: 340px;
-  perspective-origin: 50% 0%;
-  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.8) 70%, rgba(0, 0, 0, 1) 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.3) 25%, rgba(0, 0, 0, 0.8) 70%, rgba(0, 0, 0, 1) 100%);
-}
-
-.retro-perspective-grid {
-  position: absolute;
-  top: 0;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background-image: 
-    linear-gradient(to right, rgba(16, 185, 129, 0.18) 1.5px, transparent 1.5px),
-    linear-gradient(to bottom, rgba(16, 185, 129, 0.18) 1.5px, transparent 1.5px);
-  background-size: 56px 56px;
-  transform: rotateX(72deg);
-  transform-origin: 50% 0%;
-  animation: retroGridScroll 2.4s linear infinite;
-}
-
-.retro-horizon-glow {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.5) 50%, transparent 100%);
-}
-
-@keyframes retroGridScroll {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 0 56px;
-  }
-}
-
-/* Mobile Phone Responsive Optimization */
-@media (max-width: 640px) {
-  .retro-perspective-grid-container {
-    height: 38vh;
-    perspective: 260px;
-  }
-
-  .retro-perspective-grid {
-    background-size: 36px 36px;
-    animation: retroGridScrollMobile 1.8s linear infinite;
-  }
-}
-
-@keyframes retroGridScrollMobile {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 0 36px;
-  }
-}
-
-/* Professional Card System */
-.retro-card {
-  background-color: #111827;
-  border: 1px solid #1f293d;
+/* Clean Professional Cards */
+.retro-card,
+.stadium-card {
+  background-color: #111713;
+  border: 1px solid #1e2a23;
   border-radius: 0.875rem;
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.5);
 }
 
-.retro-card-interactive {
-  transition: all 0.15s ease-out;
+.retro-card-interactive,
+.stadium-card-hover {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.retro-card-interactive:hover {
-  border-color: #2b3a54;
-  background-color: #141e30;
-  box-shadow: 0 4px 14px -3px rgba(0, 0, 0, 0.4);
-  transform: translateY(-1px);
+.retro-card-interactive:hover,
+.stadium-card-hover:hover {
+  border-color: #2b3d32;
+  background-color: #141c17;
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+  transform: translateY(-1.5px);
 }
 
-.retro-card-live {
-  background-color: #0f1c24;
+.retro-card-live,
+.stadium-card-live {
+  background-color: #0e1c14;
   border: 1px solid #10b981;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.12);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.16);
   border-radius: 0.875rem;
 }
 
-/* Clean Professional Buttons */
-.retro-btn-primary {
-  background-color: #059669;
-  border: 1px solid #10b981;
-  color: #ffffff;
-  font-weight: 600;
-  border-radius: 0.625rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+/* Clean Professional Action Buttons */
+.retro-btn-primary,
+.stadium-block-btn {
+  background-color: #10b981;
+  border: 1px solid #34d399;
+  color: #07130b;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px -2px rgba(16, 185, 129, 0.4);
   transition: all 0.15s ease;
   cursor: pointer;
 }
 
-.retro-btn-primary:hover {
-  background-color: #10b981;
-  border-color: #34d399;
+.retro-btn-primary:hover,
+.stadium-block-btn:hover {
+  background-color: #059669;
+  border-color: #10b981;
+  color: #ffffff;
 }
 
-.retro-btn-primary:active {
+.retro-btn-primary:active,
+.stadium-block-btn:active {
   transform: translateY(1px);
 }
 
 .retro-btn-secondary {
-  background-color: #162032;
-  border: 1px solid #2b3a54;
-  color: #cbd5e1;
+  background-color: #141c17;
+  border: 1px solid #24342a;
+  color: #d1ded6;
   font-weight: 600;
-  border-radius: 0.625rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  border-radius: 0.75rem;
   transition: all 0.15s ease;
   cursor: pointer;
 }
 
 .retro-btn-secondary:hover {
-  background-color: #1e2c44;
-  border-color: #3b4d6e;
-  color: #ffffff;
+  background-color: #1c2720;
+  border-color: #354a3c;
+  color: #faf9f5;
 }
 
 .retro-btn-secondary:active {
   transform: translateY(1px);
 }
 
-/* Professional Inputs */
+/* Professional Form Inputs */
 .retro-input {
-  background-color: #0b1120;
-  border: 1px solid #222f46;
-  color: #f8fafc;
-  border-radius: 0.625rem;
+  background-color: #0c120e;
+  border: 1px solid #1e2a23;
+  color: #faf9f5;
+  border-radius: 0.75rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -222,44 +142,47 @@
 }
 
 .retro-badge-ft {
-  background-color: rgba(148, 163, 184, 0.12);
+  background-color: rgba(100, 116, 139, 0.15);
   border: 1px solid #334155;
   color: #94a3b8;
 }
 
 .retro-badge-upcoming {
-  background-color: rgba(56, 189, 248, 0.12);
-  border: 1px solid #0284c7;
-  color: #38bdf8;
+  background-color: rgba(16, 185, 129, 0.08);
+  border: 1px solid #1d3a28;
+  color: #6ee7b7;
 }
 
 /* Tabs & Filter Pills */
-.retro-pill-active {
-  background-color: #162032;
+.retro-pill-active,
+.stadium-pill-active {
+  background-color: #17241c;
   border: 1px solid #10b981;
   color: #34d399;
 }
 
-.retro-pill-inactive {
-  background-color: #0c1220;
-  border: 1px solid #1f293d;
-  color: #94a3b8;
+.retro-pill-inactive,
+.stadium-pill-inactive {
+  background-color: #0f1511;
+  border: 1px solid #1c2720;
+  color: #8c9e92;
 }
 
-.retro-pill-inactive:hover {
-  background-color: #141c2c;
-  color: #f1f5f9;
-  border-color: #2b3a54;
+.retro-pill-inactive:hover,
+.stadium-pill-inactive:hover {
+  background-color: #141c17;
+  color: #faf9f5;
+  border-color: #27372d;
 }
 
-/* Minimalist Retro Scrollbar */
+/* Minimalist Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0d0b;
+  background: #0c120e;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -275,42 +198,9 @@
   padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
 }
 
-/* Backwards-compatibility aliases for existing sub-components */
+/* Scoped Participant Layout Theme (Restricted to participant routes) */
 .theme-minecraft-stadium {
-  background-color: #0a0d0b;
+  background-color: #0b110e;
   color: #f1f5f9;
   min-height: 100vh;
-}
-.theme-minecraft-stadium .stadium-card {
-  background-color: #0f1411;
-  border: 1px solid #1f2e26;
-  box-shadow: 0 2px 0 #070a08, inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  border-radius: 0.875rem;
-}
-.theme-minecraft-stadium .stadium-card-hover:hover {
-  border-color: #365342;
-  background-color: #131b16;
-}
-.theme-minecraft-stadium .stadium-card-live {
-  background-color: #121c16;
-  border: 1px solid #84cc16;
-  box-shadow: 0 3px 0 #09130d, 0 0 20px rgba(132, 204, 22, 0.18);
-  border-radius: 0.875rem;
-}
-.theme-minecraft-stadium .stadium-block-btn {
-  background-color: #84cc16;
-  border: 1px solid #a3e635;
-  color: #0a0d0b;
-  font-weight: 800;
-  border-radius: 0.625rem;
-}
-.theme-minecraft-stadium .stadium-pill-active {
-  background-color: #1a261f;
-  border: 1px solid #84cc16;
-  color: #bef264;
-}
-.theme-minecraft-stadium .stadium-pill-inactive {
-  background-color: #101612;
-  border: 1px solid #1f2d24;
-  color: #94a3b8;
 }

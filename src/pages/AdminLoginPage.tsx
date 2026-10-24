@@ -136,7 +136,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   };
 
   return (
-    <div className="max-w-md mx-auto my-10 p-6 sm:p-8 bg-[#111827] rounded-2xl border border-[#1f293d] shadow-xl text-[#f1f5f9] relative">
+    <div className="max-w-md mx-auto my-10 p-6 sm:p-8 bg-[#0f1712] rounded-2xl border border-[#1e3425] shadow-xl text-[#faf9f5] relative">
       
       {/* Return Navigation */}
       <button
@@ -149,12 +149,12 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
 
       {/* Brand Header */}
       <div className="text-center mb-8">
-        <div className="w-12 h-12 rounded-xl bg-[#162032] border border-[#2b3a54] mx-auto flex items-center justify-center text-emerald-400 mb-3 shadow-xs">
+        <div className="w-12 h-12 rounded-xl bg-[#132219] border border-[#203a29] mx-auto flex items-center justify-center text-emerald-400 mb-3 shadow-xs">
           <Trophy className="w-6 h-6 text-emerald-400" />
         </div>
         
-        <h1 className="text-2xl font-bold tracking-tight text-[#f8fafc]">
-          Tourn<span className="text-emerald-400 font-pixel">X</span>
+        <h1 className="text-2xl font-bold tracking-tight text-[#faf9f5]">
+          Tourn<span className="text-emerald-400">X</span>
         </h1>
         <p className="text-xs text-slate-400 mt-1 font-sans">
           {authView === 'FORGOT_PASSWORD'
@@ -209,7 +209,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="organizer@club.com"
-              className="w-full pl-10 pr-3.5 py-2.5 bg-[#0b1120] border border-[#222f46] rounded-xl text-sm text-[#f8fafc] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none font-sans placeholder:text-slate-500 transition"
+              className="w-full pl-10 pr-3.5 py-2.5 bg-[#0a110d] border border-[#1e3425] rounded-xl text-sm text-[#faf9f5] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none font-sans placeholder:text-slate-500 transition"
             />
           </div>
         </div>
@@ -242,7 +242,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-[#0b1120] border border-[#222f46] rounded-xl text-sm text-[#f8fafc] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none font-sans placeholder:text-slate-500 transition"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-[#0a110d] border border-[#1e3425] rounded-xl text-sm text-[#faf9f5] focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 focus:outline-none font-sans placeholder:text-slate-500 transition"
               />
             </div>
           </div>
