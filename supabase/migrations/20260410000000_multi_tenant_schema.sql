@@ -626,7 +626,7 @@ CREATE OR REPLACE FUNCTION redeem_tournament_access_code(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   v_code RECORD;
@@ -681,7 +681,7 @@ BEGIN
   -- Accepts either plain access code or precomputed 64-char hex hash
   v_target_hash := CASE
     WHEN length(trim(p_code)) = 64 AND p_code ~ '^[0-9a-fA-F]{64}$' THEN lower(trim(p_code))
-    ELSE encode(digest('tx_salt_' || upper(trim(p_code)), 'sha256'), 'hex')
+    ELSE encode(extensions.digest(('tx_salt_' || upper(trim(p_code)))::bytea, 'sha256'), 'hex')
   END;
 
   -- 5. Verify Hash against tournament access_codes

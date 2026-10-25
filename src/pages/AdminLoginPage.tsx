@@ -22,14 +22,53 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
   const [isUnconfirmedError, setIsUnconfirmedError] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  const isReservedDemoAddress = (addr: string) => {
+    const lower = addr.toLowerCase().trim();
+    return (
+      lower === 'admin@ftm.local' ||
+      lower.endsWith('.local') ||
+      lower === 'admin@demo.com' ||
+      lower === 'admin'
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setErrorMsg('');
     setInfoMsg('');
     setIsUnconfirmedError(false);
-    setLoading(true);
 
     const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setErrorMsg('Please enter an email address.');
+      return;
+    }
+
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      setErrorMsg('Please enter a valid, deliverable email address (e.g., organizer@domain.com).');
+      return;
+    }
+
+    if (authView === 'SIGN_UP' && isReservedDemoAddress(cleanEmail)) {
+      setErrorMsg(
+        `"${cleanEmail}" is a reserved demo identity and cannot be registered as a cloud organizer account. Please use your genuine, deliverable email address.`
+      );
+      return;
+    }
+
+    if (authView === 'SIGN_IN' && isReservedDemoAddress(cleanEmail) && !import.meta.env.DEV) {
+      setErrorMsg(
+        'Demo credentials (such as admin@ftm.local) are restricted to local development environments and cannot authenticate against cloud tournaments.'
+      );
+      return;
+    }
+
+    setLoading(true);
 
     try {
       if (authView === 'FORGOT_PASSWORD') {
@@ -60,7 +99,21 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             email: cleanEmail,
             password,
           });
-          if (error) throw error;
+          if (error) {
+            const isRateLimit =
+              error.status === 429 ||
+              (error as any).code === 'over_email_send_rate_limit' ||
+              error.message.toLowerCase().includes('rate limit') ||
+              error.message.toLowerCase().includes('email rate limit exceeded');
+
+            if (isRateLimit) {
+              setErrorMsg(
+                'Supabase email sending rate limit reached. The free tier limits verification emails (typically 3–4 per hour) to prevent abuse. If you already registered, please sign in. Otherwise, please wait 15–30 minutes before trying again.'
+              );
+              return;
+            }
+            throw error;
+          }
 
           if (data.session) {
             onLoginSuccess();
@@ -92,7 +145,17 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({
             }
 
             if ((error as any).code === 'invalid_credentials' || error.message.toLowerCase().includes('invalid login credentials')) {
-              setErrorMsg('Invalid email or password. Please verify your credentials.');
+              setErrorMsg('Invalid email or password. Please verify your credentials or register a new account.');
+              return;
+            }
+
+            const isRateLimit =
+              error.status === 429 ||
+              (error as any).code === 'over_email_send_rate_limit' ||
+              error.message.toLowerCase().includes('rate limit');
+
+            if (isRateLimit) {
+              setErrorMsg('Sign-in attempts temporarily rate limited. Please wait a few minutes before retrying.');
               return;
             }
 

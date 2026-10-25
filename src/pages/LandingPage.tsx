@@ -67,8 +67,22 @@ export function LandingPage({
   const [modifierSuccess, setModifierSuccess] = useState<string | null>(null);
 
   // ================= ORGANIZER AUTH HANDLERS =================
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  const isReservedDemoAddress = (addr: string) => {
+    const lower = addr.toLowerCase().trim();
+    return (
+      lower === 'admin@ftm.local' ||
+      lower.endsWith('.local') ||
+      lower === 'admin@demo.com' ||
+      lower === 'admin'
+    );
+  };
+
   const handleOrganizerAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authLoading) return;
+
     setAuthError(null);
     setAuthSuccess(null);
     setIsUnconfirmed(false);
@@ -82,7 +96,18 @@ export function LandingPage({
       return;
     }
 
+    if (!EMAIL_REGEX.test(email)) {
+      setAuthError('Please enter a valid, deliverable email address (e.g., organizer@domain.com).');
+      return;
+    }
+
     if (authMode === 'SIGN_UP') {
+      if (isReservedDemoAddress(email)) {
+        setAuthError(
+          `"${email}" is a reserved development identity and cannot be registered as a cloud organizer account. Please use your genuine, deliverable email address.`
+        );
+        return;
+      }
       if (password.length < 8) {
         setAuthError('Password must be at least 8 characters long.');
         return;
@@ -90,6 +115,17 @@ export function LandingPage({
       if (password !== organizerConfirmPassword) {
         setAuthError('Passwords do not match. Please re-enter.');
         return;
+      }
+    }
+
+    if (authMode === 'SIGN_IN') {
+      if (isReservedDemoAddress(email)) {
+        if (!import.meta.env.DEV) {
+          setAuthError(
+            'Demo accounts (such as admin@ftm.local) are restricted to local development environments only and cannot access or modify cloud tournaments. Please sign in with your verified organizer credentials.'
+          );
+          return;
+        }
       }
     }
 
@@ -112,11 +148,20 @@ export function LandingPage({
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
-          if (error.message.toLowerCase().includes('email not confirmed')) {
+          const isRateLimit =
+            error.status === 429 ||
+            (error as any).code === 'over_email_send_rate_limit' ||
+            error.message.toLowerCase().includes('rate limit');
+
+          if (isRateLimit) {
+            setAuthError(
+              'Sign-in rate limit temporarily reached. Please wait a few minutes before trying again.'
+            );
+          } else if (error.message.toLowerCase().includes('email not confirmed')) {
             setIsUnconfirmed(true);
-            setAuthError('Your email address has not been confirmed yet. Please verify your email or resend confirmation.');
+            setAuthError('Your email address has not been confirmed yet. Please verify your email inbox or click resend below.');
           } else if (error.message.toLowerCase().includes('invalid login credentials')) {
-            setAuthError('Invalid email or password. Please verify your credentials.');
+            setAuthError('Invalid email or password. Please verify your credentials or register a new organizer account.');
           } else {
             setAuthError(error.message);
           }
@@ -143,7 +188,21 @@ export function LandingPage({
         });
 
         if (error) {
-          setAuthError(error.message);
+          const isRateLimit =
+            error.status === 429 ||
+            (error as any).code === 'over_email_send_rate_limit' ||
+            error.message.toLowerCase().includes('email rate limit exceeded') ||
+            error.message.toLowerCase().includes('rate limit');
+
+          if (isRateLimit) {
+            setAuthError(
+              'Supabase email rate limit reached (typically 3–4 verification emails per hour on the free tier). To prevent spam, new verification emails are temporarily paused. If you already have an account, please switch to "Sign In". Otherwise, please wait 15–30 minutes before trying again.'
+            );
+          } else if (error.message.toLowerCase().includes('already registered')) {
+            setAuthError(`An organizer account with "${email}" already exists. Please switch to the Sign In tab.`);
+          } else {
+            setAuthError(error.message);
+          }
           return;
         }
 
@@ -152,9 +211,15 @@ export function LandingPage({
           setTimeout(() => {
             onOrganizeClick();
           }, 500);
+        } else if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          // Supabase returns empty identities array when user already exists (enumeration defense)
+          setAuthError(
+            `An organizer account with "${email}" already exists. Please switch to "Sign In" or reset your password.`
+          );
+          setAuthMode('SIGN_IN');
         } else {
           setAuthSuccess(
-            'Organizer account registered successfully! A confirmation link has been sent to your email. Please confirm your email and then sign in.'
+            `Organizer registration submitted! A confirmation link has been sent to ${email}. Please check your inbox (and spam folder) to confirm, then sign in.`
           );
           setAuthMode('SIGN_IN');
           setOrganizerPassword('');
@@ -163,7 +228,7 @@ export function LandingPage({
       } else if (authMode === 'FORGOT_PASSWORD') {
         const { success, error } = await sendPasswordResetEmail(email);
         if (success) {
-          setAuthSuccess('Password reset link sent to your email address.');
+          setAuthSuccess(`Password reset instructions sent to ${email}. Please check your inbox.`);
         } else {
           setAuthError(error || 'Failed to send password reset email.');
         }
