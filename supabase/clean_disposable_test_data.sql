@@ -65,6 +65,13 @@ WHERE tournament_id IN (
   'a0d5ce7e-14c0-4945-9da5-05602ac20cd2'
 );
 
+DELETE FROM audit_logs 
+WHERE tournament_id IN (
+  'd3959224-cfab-48b0-b9db-81125f0d85ad',
+  '763809f3-0e6d-41a3-b5d1-9e56fd37547b',
+  'a0d5ce7e-14c0-4945-9da5-05602ac20cd2'
+);
+
 -- 2. Safely remove the 3 confirmed disposable test tournaments
 DELETE FROM tournaments 
 WHERE id IN (
