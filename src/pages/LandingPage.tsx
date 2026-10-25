@@ -32,6 +32,8 @@ interface LandingPageProps {
 export function LandingPage({
   onOrganizeClick,
   onJoinTournament,
+  onOpenPublicDemo,
+  activeTournament,
   noticeMessage,
   isAdminLoggedIn = false,
 }: LandingPageProps) {
@@ -226,17 +228,18 @@ export function LandingPage({
     e.preventDefault();
     setPublicError(null);
 
-    const input = publicInput.trim();
-    if (!input) {
-      setPublicError('Please enter a public tournament link or tournament slug.');
-      return;
-    }
+    const rawInput = publicInput.trim();
+    const input = (rawInput && rawInput.toLowerCase() !== 'hub' && rawInput.toLowerCase() !== 'public') 
+      ? rawInput 
+      : (activeTournament?.slug || 'tournx-championship');
 
     setPublicLoading(true);
     try {
       const res = await tournamentService.resolvePublicTournament(input);
       if (res.success && res.tournament) {
         onJoinTournament(res.tournament.slug || res.tournament.id);
+      } else if (onOpenPublicDemo) {
+        onOpenPublicDemo();
       } else {
         setPublicError(res.error || 'Tournament not found or is set to private access.');
       }

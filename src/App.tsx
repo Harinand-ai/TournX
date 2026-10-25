@@ -68,18 +68,24 @@ const parseCurrentRoute = (): RouteState => {
     if (hashRaw === 'admin/login' || hashRaw === 'admin-login') {
       return { tab: 'admin-login' };
     }
+    if (hashRaw === 'hub' || hashRaw === 'public-hub' || hashRaw === 'public') {
+      return { tab: 'public-tournament' };
+    }
     const [hTab, hParam] = hashRaw.split('/');
     if (['home', 'matches', 'fixtures', 'results', 'match-detail', 'teams', 'team-detail', 'stats', 'table', 'rules', 'landing', 'workspace', 'organize'].includes(hTab)) {
       return { tab: hTab, param: hParam };
     }
   }
 
-  // 2. Check URL pathname (e.g. /t/slug, /workspace, /organize)
+  // 2. Check URL pathname (e.g. /t/slug, /workspace, /organize, /hub)
   const pathname = window.location.pathname.replace(/^\/+|\/+$/g, '').trim();
   if (pathname) {
     if (pathname.startsWith('t/')) {
       const parts = pathname.split('/');
       return { tourneySlug: parts[1], tab: 'public-tournament', param: parts[2] };
+    }
+    if (pathname === 'hub' || pathname === 'public-hub' || pathname === 'public') {
+      return { tab: 'public-tournament' };
     }
     if (pathname === 'organize' || pathname === 'setup' || pathname === 'wizard') {
       return { tab: 'organize' };
