@@ -58,7 +58,13 @@ class TournamentService {
         }
 
         if (data && data.length > 0) {
-          const cloudList = (data as Tournament[]).filter(t => !t.deleted_at && t.status !== 'ARCHIVED');
+          const cloudList = (data as Tournament[]).filter(t => 
+            !t.deleted_at && 
+            t.status !== 'ARCHIVED' &&
+            !localDataService.isTournamentDeleted(t.id) &&
+            t.id !== 'd3959224-cfab-48b0-b9db-81125f0d85ad' &&
+            t.slug !== 'prem'
+          );
           return cloudList;
         }
       } catch (err: any) {
@@ -73,6 +79,9 @@ class TournamentService {
 
   async getTournament(idOrSlug: string): Promise<Tournament | null> {
     if (!idOrSlug) return null;
+    if (localDataService.isTournamentDeleted(idOrSlug) || idOrSlug === 'd3959224-cfab-48b0-b9db-81125f0d85ad' || idOrSlug.toLowerCase() === 'prem') {
+      return null;
+    }
     const local = localDataService.getTournamentById(idOrSlug) || localDataService.getTournamentBySlug(idOrSlug);
 
     // If already exists in local storage and is a local synthetic tournament (non-UUID), return immediately
@@ -375,6 +384,68 @@ class TournamentService {
     }
 
     return localDataService.deleteTournament(tournamentId);
+  }
+
+  async deleteAllUserTournaments(): Promise<{ count: number; deletedIds: string[]; errors?: string[] }> {
+    const deletedIds: string[] = [];
+    const errors: string[] = [];
+
+    // 1. If Supabase configured, delete all cloud tournaments created by authenticated user
+    if (isSupabaseConfigured && supabase) {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+      if (user) {
+        const { data: userTourneys, error: fetchErr } = await supabase
+          .from('tournaments')
+          .select('id, name, slug')
+          .eq('created_by', user.id);
+
+        if (fetchErr) {
+          console.error('[TournX] Fetch user tournaments for deletion error:', fetchErr);
+          throw new Error(`Failed to list user tournaments: ${fetchErr.message}`);
+        }
+
+        if (userTourneys && userTourneys.length > 0) {
+          for (const t of userTourneys) {
+            // Strictly preserve DEMO and HOSTEL LEAGUE 26
+            if (t.id === DEMO_TOURNAMENT_ID || t.slug === 'hostel-league-26' || t.name?.toLowerCase().includes('hostel league 26')) {
+              continue;
+            }
+            try {
+              // Delete dependent records first to satisfy foreign keys
+              await supabase.from('match_events').delete().eq('tournament_id', t.id);
+              await supabase.from('matches').delete().eq('tournament_id', t.id);
+              await supabase.from('stage_teams').delete().eq('tournament_id', t.id);
+              await supabase.from('players').delete().eq('tournament_id', t.id);
+              await supabase.from('teams').delete().eq('tournament_id', t.id);
+              await supabase.from('groups').delete().eq('tournament_id', t.id);
+              await supabase.from('tournament_stages').delete().eq('tournament_id', t.id);
+              await supabase.from('access_codes').delete().eq('tournament_id', t.id);
+              await supabase.from('tournament_members').delete().eq('tournament_id', t.id);
+              const { error: delErr } = await supabase.from('tournaments').delete().eq('id', t.id).eq('created_by', user.id);
+              if (delErr) {
+                errors.push(`Failed to delete "${t.name}": ${delErr.message}`);
+              } else {
+                deletedIds.push(t.id);
+                localDataService.deleteTournament(t.id);
+              }
+            } catch (err: any) {
+              errors.push(`Error deleting "${t.name}": ${err.message}`);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Also clear local synthetic non-demo tournaments
+    const localRes = localDataService.deleteAllUserTournaments();
+    for (const id of localRes.deletedIds) {
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+      }
+    }
+
+    return { count: deletedIds.length, deletedIds, errors: errors.length > 0 ? errors : undefined };
   }
 
   // ================= TEAMS =================
@@ -1213,16 +1284,120 @@ class TournamentService {
   }
 
   // ================= TOURNAMENT DRAFTS =================
-  getDrafts() {
+  getDrafts(): any[] {
     return localDataService.getDrafts();
+  }
+
+  async getDraftsAsync(): Promise<any[]> {
+    const localDrafts = localDataService.getDrafts();
+    if (!isSupabaseConfigured || !supabase) {
+      return localDrafts;
+    }
+
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id;
+
+      // Query cloud drafts: status = 'DRAFT' or owned tournaments with status = 'DRAFT'
+      let query = supabase
+        .from('tournaments')
+        .select('id, name, description, status, created_at, updated_at, created_by')
+        .eq('status', 'DRAFT')
+        .order('updated_at', { ascending: false });
+
+      const { data: cloudDrafts, error } = await query;
+      if (error) {
+        console.warn('[TournX] Notice fetching cloud drafts:', error.message);
+        return localDrafts;
+      }
+
+      const merged = [...localDrafts];
+      if (cloudDrafts && cloudDrafts.length > 0) {
+        for (const cd of cloudDrafts) {
+          if (
+            cd.id === 'd3959224-cfab-48b0-b9db-81125f0d85ad' ||
+            cd.name?.toLowerCase() === 'prem' ||
+            localDataService.isTournamentDeleted(cd.id)
+          ) {
+            continue;
+          }
+          if (userId && cd.created_by && cd.created_by !== userId) {
+            continue;
+          }
+          if (!merged.some(d => d.id === cd.id)) {
+            merged.push({
+              id: cd.id,
+              name: cd.name || 'Cloud Draft Tournament',
+              prompt: cd.description || `Cloud draft tournament (${cd.name})`,
+              teamsCount: 0,
+              format: 'Single Round-Robin',
+              status: 'DRAFT',
+              updated_at: cd.updated_at || cd.created_at || new Date().toISOString(),
+              isCloud: true,
+              createdBy: cd.created_by,
+              isOwner: userId ? cd.created_by === userId : false,
+            });
+          }
+        }
+      }
+
+      return merged;
+    } catch (err) {
+      console.warn('[TournX] Failed to load cloud drafts:', err);
+      return localDrafts;
+    }
   }
 
   saveDraft(draft: any) {
     return localDataService.saveDraft(draft);
   }
 
-  deleteDraft(draftId: string) {
-    return localDataService.deleteDraft(draftId);
+  async deleteDraft(draftId: string): Promise<boolean> {
+    localDataService.deleteDraft(draftId);
+    localDataService.markTournamentDeleted(draftId);
+    if (isSupabaseConfigured && supabase && isValidUuid(draftId)) {
+      try {
+        // Use deleteTournament for full cascading cleanup of dependent records
+        await this.deleteTournament(draftId).catch(async () => {
+          // Fallback direct delete if deleteTournament ownership check blocks an orphaned draft
+          if (supabase) {
+            await supabase
+              .from('tournaments')
+              .delete()
+              .eq('id', draftId);
+          }
+        });
+      } catch (err) {
+        console.warn('[TournX] Cloud draft delete notice:', err);
+      }
+    }
+    return true;
+  }
+
+  async deleteAllDrafts(): Promise<{ localCount: number; cloudCount: number }> {
+    const localCount = localDataService.deleteAllDrafts();
+    let cloudCount = 0;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) {
+          const { data: deletedCloudDrafts, error } = await supabase
+            .from('tournaments')
+            .delete()
+            .eq('status', 'DRAFT')
+            .eq('created_by', authData.user.id)
+            .select('id');
+          if (!error && deletedCloudDrafts) {
+            cloudCount = deletedCloudDrafts.length;
+          }
+        }
+      } catch (err) {
+        console.warn('[TournX] Cloud drafts purge notice:', err);
+      }
+    }
+
+    return { localCount, cloudCount };
   }
 }
 

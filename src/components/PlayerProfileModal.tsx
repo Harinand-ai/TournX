@@ -71,20 +71,20 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
   const standing = standings.find(s => s.team.id === player.team_id);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-      <div className="relative w-full max-w-sm bg-[#0f1411] rounded-2xl border border-[#1f2e26] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-[#f1f5f9]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs">
+      <div className="relative w-full max-w-sm bg-[#19191F] rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-[#F0E9E7]">
         
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#18231c] hover:bg-[#203126] text-slate-400 hover:text-white transition-colors cursor-pointer border border-[#273a2f]"
+          className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-[#141418] hover:bg-[#202028] text-[#A5A1A4] hover:text-[#F0E9E7] transition-colors cursor-pointer border border-white/10"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Modal Header */}
-        <div className="p-5 text-center bg-[#141d18] border-b border-[#1f2e26]">
+        <div className="p-6 text-center bg-[#141418] border-b border-white/[0.08]">
           <div className="flex justify-center mb-3">
             <PlayerAvatar
               player={player}
@@ -94,11 +94,11 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
           </div>
 
           <div className="flex items-center justify-center gap-2">
-            <h2 className="text-lg font-mono font-bold text-[#f1f5f9] tracking-tight">
+            <h2 className="text-lg font-display font-bold text-[#F0E9E7] tracking-tight">
               {player.name}
             </h2>
             {player.is_captain && (
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-extrabold uppercase bg-amber-500 text-black">
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-[#F02D50] text-white">
                 CAPTAIN
               </span>
             )}
@@ -111,11 +111,11 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
                 onClose();
                 onNavigateToTeam?.(team.id);
               }}
-              className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 hover:text-lime-400 transition-colors cursor-pointer"
+              className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-mono text-[#A5A1A4] hover:text-[#F02D50] transition-colors cursor-pointer"
             >
               <TeamBadge team={team} size="xs" />
               <span>{team.name}</span>
-              <span className="text-slate-500">• {player.position}</span>
+              <span className="text-[#6E6A6D]">• {player.position}</span>
             </button>
           )}
         </div>
@@ -123,41 +123,41 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
         {/* Official Stats Grid */}
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="p-2.5 bg-[#141d18] rounded-xl border border-[#24352b]">
-              <span className="text-[10px] text-slate-400 font-mono font-bold block uppercase">Matches</span>
-              <span className="text-lg font-mono font-black text-[#f1f5f9]">{matchesPlayed}</span>
+            <div className="p-3 bg-[#101013] rounded-xl border border-white/10">
+              <span className="text-[10px] text-[#A5A1A4] font-mono font-bold block uppercase">Matches</span>
+              <span className="text-lg font-score font-black text-[#F0E9E7]">{matchesPlayed}</span>
             </div>
 
-            <div className="p-2.5 bg-lime-950/40 rounded-xl border border-lime-800/60">
-              <span className="text-[10px] text-lime-400 font-mono font-bold block uppercase">Goals</span>
-              <span className="text-lg font-mono font-black text-lime-300">{playerGoals.length}</span>
+            <div className="p-3 bg-[#21191D] rounded-xl border border-[#F02D50]/40">
+              <span className="text-[10px] text-[#F02D50] font-mono font-bold block uppercase">Goals</span>
+              <span className="text-lg font-score font-black text-[#F02D50]">{playerGoals.length}</span>
             </div>
 
-            <div className="p-2.5 bg-amber-950/40 rounded-xl border border-amber-800/60">
+            <div className="p-3 bg-[#21191D] rounded-xl border border-amber-800/40">
               <span className="text-[10px] text-amber-400 font-mono font-bold block uppercase">POTM</span>
-              <span className="text-lg font-mono font-black text-amber-300">{playerMotms.length}</span>
+              <span className="text-lg font-score font-black text-amber-300">{playerMotms.length}</span>
             </div>
           </div>
 
           {/* Clean sheets stat if goalkeeper or defender */}
           {isDefensive && (
-            <div className="p-2.5 bg-[#141d18] rounded-xl border border-[#24352b] flex items-center justify-between text-xs font-mono">
+            <div className="p-2.5 bg-[#101013] rounded-xl border border-white/10 flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-lime-400" />
-                <span className="text-slate-300 font-semibold">Clean Sheets Kept</span>
+                <Shield className="w-4 h-4 text-[#F02D50]" />
+                <span className="text-[#A5A1A4]">Clean Sheets Kept</span>
               </div>
-              <span className="text-sm font-bold text-lime-400">{cleanSheetsCount}</span>
+              <span className="text-sm font-bold text-[#F0E9E7]">{cleanSheetsCount}</span>
             </div>
           )}
 
           {/* Team Standing Context */}
           {standing && team && (
-            <div className="p-2.5 bg-[#141d18] rounded-xl border border-[#24352b] flex items-center justify-between text-xs font-mono">
+            <div className="p-2.5 bg-[#101013] rounded-xl border border-white/10 flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-400" />
-                <span className="text-slate-300 font-semibold">{team.name} Standing</span>
+                <Trophy className="w-4 h-4 text-[#F02D50]" />
+                <span className="text-[#A5A1A4]">{team.name} Standing</span>
               </div>
-              <span className="text-xs font-bold text-amber-300">
+              <span className="text-xs font-bold text-[#F0E9E7]">
                 Rank #{standing.position} ({standing.points} pts)
               </span>
             </div>
@@ -165,11 +165,11 @@ export const PlayerProfileModal: React.FC<PlayerProfileModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3 bg-[#141d18] border-t border-[#1f2e26] text-center">
+        <div className="p-3 bg-[#141418] border-t border-white/[0.08] text-center">
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-2 bg-[#1a261f] hover:bg-[#203126] border border-[#273a2f] rounded-lg text-xs font-mono font-bold text-slate-300 hover:text-white uppercase tracking-wider transition-colors cursor-pointer"
+            className="w-full py-2 bg-[#19191F] hover:bg-[#202028] border border-white/10 rounded-lg text-xs font-mono font-bold text-[#F0E9E7] uppercase tracking-wider transition-colors cursor-pointer"
           >
             Close
           </button>

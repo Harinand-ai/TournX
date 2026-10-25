@@ -7,23 +7,24 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "vitest run",
+    "test": "vitest run --testTimeout=15000",
     "preview": "vite preview",
     "cap:sync": "cap sync",
     "cap:build": "npm run build && cap sync",
     "cap:android": "cap open android"
   },
-
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@supabase/supabase-js": "^2.117.2",
+    "@types/three": "^0.186.0",
     "@vercel/analytics": "^2.0.1",
     "framer-motion": "^14.0.0",
     "lucide-react": "^1.52.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

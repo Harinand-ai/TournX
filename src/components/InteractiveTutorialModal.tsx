@@ -16,7 +16,8 @@ import {
   MapPin,
   Shield,
   Eye,
-  CheckCircle2
+  CheckCircle2,
+  UserCheck
 } from 'lucide-react';
 
 interface InteractiveTutorialModalProps {
@@ -43,7 +44,7 @@ export const InteractiveTutorialModal: React.FC<InteractiveTutorialModalProps> =
   const [copiedExample, setCopiedExample] = useState(false);
 
   const samplePrompt =
-    "Create a six-team football tournament called Kerala Champions Cup. Use single round-robin, starting November 15, at Kannur Municipal Stadium. Six teams: Kerala Blasters, Bengaluru FC, Chennaiyin FC, Mumbai City FC, FC Goa, Hyderabad FC.";
+    `Team 1: FC Goa\nPlayers:\n- Player One — Goalkeeper\n- Player Two — Defender\n- Player Three — Midfielder\n- Player Four — Forward\n\nTeam 2: Chennaiyin FC\nPlayers:\n- Player Five — Goalkeeper\n- Player Six — Defender\n- Player Seven — Midfielder\n- Player Eight — Forward`;
 
   const handleCopyPrompt = () => {
     navigator.clipboard?.writeText(samplePrompt);
@@ -52,181 +53,201 @@ export const InteractiveTutorialModal: React.FC<InteractiveTutorialModalProps> =
   };
 
   const steps: TutorialStep[] = [
+    // Step 1: Describing the tournament
     {
-      title: 'Welcome to TournX',
-      subtitle: 'Natural-language football tournament management',
+      title: 'Describing the Tournament',
+      subtitle: 'Natural language setup in plain English',
       badge: 'Step 1 of 6',
-      icon: <Trophy className="w-6 h-6 text-emerald-400" />,
+      icon: <Trophy className="w-5 h-5 text-[#F02D50]" />,
       description:
-        'TournX replaces rigid spreadsheets and complicated forms with a conversational master prompt. Simply describe your tournament in plain English, and our deterministic engine creates schedules, squads, and scoreboards automatically.',
+        'Start by typing what tournament you want to organize. Specify the tournament name, competition format (knockout or round-robin), start date, kick-off time, venue, and match duration.',
       content: (
-        <div className="rounded-xl p-5 bg-[#121c15] border border-[#233c2a] text-center space-y-4 shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-[#162e20] border border-[#2c5339] text-emerald-400 flex items-center justify-center mx-auto shadow-md">
-            <Trophy className="w-8 h-8 text-emerald-400" />
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-3 shadow-md">
+          <div className="flex items-center gap-2 text-xs text-[#F02D50] font-mono font-semibold">
+            <Sparkles className="w-3.5 h-3.5" /> Core Tournament Parameters
           </div>
-          <div>
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[#1b3a28] text-emerald-300 border border-[#2d5c40]">
-              think • prompt • organise
-            </span>
-            <h4 className="text-base font-bold text-[#faf9f5] mt-3">From Description to Matchday in Seconds</h4>
-            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed max-w-sm mx-auto">
-              Organizers get complete control over matches, rules, and squad rosters. Participants get live match updates without needing to create accounts.
-            </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#A5A1A4] font-mono block">FORMAT</span>
+              <span className="font-semibold text-[#F0E9E7]">Knockout / League</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#A5A1A4] font-mono block">STYLE</span>
+              <span className="font-semibold text-[#F0E9E7]">5s, 7s, or 11-a-side</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#F02D50] shrink-0" />
+              <span className="text-[#F0E9E7] truncate">Dates & Times</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#F02D50] shrink-0" />
+              <span className="text-[#F0E9E7] truncate">Pitch / Stadium</span>
+            </div>
           </div>
-        </div>
-      )
-    },
-    {
-      title: 'Describe Your Tournament',
-      subtitle: 'Write in ordinary English — no rigid templates',
-      badge: 'Step 2 of 6',
-      icon: <Sparkles className="w-6 h-6 text-emerald-400" />,
-      description:
-        'Tell TournX your tournament name, dates, venue, teams, format, and rules. The parser understands natural paragraphs, bullet points, multi-word club names, and points rules.',
-      content: (
-        <div className="rounded-xl p-4 bg-[#121c15] border border-[#233c2a] space-y-3 shadow-sm">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> Example Prompt
-            </span>
-            <button
-              onClick={handleCopyPrompt}
-              className="text-[11px] text-slate-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-[#1a2f22] border border-[#2d523a] transition cursor-pointer"
-            >
-              {copiedExample ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              <span>{copiedExample ? 'Copied!' : 'Copy Prompt'}</span>
-            </button>
-          </div>
-          <div className="p-3.5 rounded-lg bg-[#0b130e] border border-[#1e3425] text-xs font-sans text-slate-200 leading-relaxed italic">
-            "{samplePrompt}"
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Tip: You can also specify player rosters, managers, captains, 5-a-side or 7-a-side formats, and tie-breaker rules in the prompt!
+          <p className="text-[11px] text-[#A5A1A4] leading-relaxed">
+            You can write a flowing paragraph or concise bullet points. TournX deterministically extracts dates, venues, points systems, and formats.
           </p>
         </div>
       )
     },
+
+    // Step 2: Including team names and player lists
     {
-      title: 'Review the Generated Preview',
-      subtitle: 'Deterministic extraction with full manual editing',
-      badge: 'Step 3 of 6',
-      icon: <FileText className="w-6 h-6 text-emerald-400" />,
+      title: 'Including Team Names & Squad Lists',
+      subtitle: 'Clear team blocks and explicit player sections',
+      badge: 'Step 2 of 6',
+      icon: <Users className="w-5 h-5 text-[#F02D50]" />,
       description:
-        'TournX extracts key data into an interactive preview card. If any club name, kick-off time, or date needs correction, simply click and edit before generating final fixtures.',
+        'To have TournX create teams and populate their rosters automatically, include distinct team headings (e.g. "Team 1: FC Goa" or "Team A: Chennaiyin FC") followed by a "Players:" section with names on separate lines.',
       content: (
-        <div className="rounded-xl p-4 bg-[#121c15] border border-[#233c2a] space-y-3 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#233c2a] pb-2 text-xs">
-            <span className="font-bold text-[#faf9f5]">Kerala Champions Cup (Preview)</span>
-            <span className="px-2 py-0.5 rounded bg-[#1a3826] text-emerald-300 text-[10px] font-semibold">Ready to Confirm</span>
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-3 shadow-md">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#F02D50] font-mono font-semibold flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Suggested Formatting
+            </span>
+            <button
+              onClick={handleCopyPrompt}
+              className="text-[11px] text-[#A5A1A4] hover:text-[#F0E9E7] flex items-center gap-1 px-2.5 py-1 rounded bg-[#19191F] border border-white/10 transition cursor-pointer"
+            >
+              {copiedExample ? <Check className="w-3 h-3 text-[#F02D50]" /> : <Copy className="w-3 h-3" />}
+              <span>{copiedExample ? 'Copied!' : 'Copy Example'}</span>
+            </button>
+          </div>
+          <div className="p-3 rounded-lg bg-[#101013] border border-white/10 text-xs font-mono text-[#F0E9E7] whitespace-pre-line leading-relaxed max-h-36 overflow-y-auto">
+            {samplePrompt}
+          </div>
+          <p className="text-[11px] text-[#A5A1A4]">
+            While natural descriptions work, separating each team and listing players under a "Players:" section ensures 100% squad association accuracy.
+          </p>
+        </div>
+      )
+    },
+
+    // Step 3: Assigning players to teams and specifying positions
+    {
+      title: 'Assigning Positions, Captains & Managers',
+      subtitle: 'Recognizing standard positions, abbreviations, and roles',
+      badge: 'Step 3 of 6',
+      icon: <UserCheck className="w-5 h-5 text-[#F02D50]" />,
+      description:
+        'Attach positions to players using hyphens, colons, commas, or parentheses (e.g. "Player A — Goalkeeper", "Player B (DEF)", "Player C, Midfielder"). Specify captains, managers, or substitutes explicitly.',
+      content: (
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-2.5 shadow-md text-xs">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#F02D50] font-mono font-bold block">GOALKEEPER</span>
+              <span className="text-[#F0E9E7] font-mono">Goalkeeper, Keeper, GK</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#F02D50] font-mono font-bold block">DEFENDER</span>
+              <span className="text-[#F0E9E7] font-mono">Defender, CB, LB, RB, DEF</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#F02D50] font-mono font-bold block">MIDFIELDER</span>
+              <span className="text-[#F0E9E7] font-mono">Midfielder, CM, CDM, CAM, MID</span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#F02D50] font-mono font-bold block">FORWARD</span>
+              <span className="text-[#F0E9E7] font-mono">Forward, Striker, ST, FWD</span>
+            </div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-[#21191D] border border-[#F02D50]/30 text-[#F0E9E7] font-mono text-[11px]">
+            Roles: "Captain", "(C)", "Manager: John Doe", "Substitute", "Bench"
+          </div>
+        </div>
+      )
+    },
+
+    // Step 4: Reviewing and correcting the parsed preview
+    {
+      title: 'Reviewing & Correcting the Preview',
+      subtitle: 'Interactive inspection with full manual overrides',
+      badge: 'Step 4 of 6',
+      icon: <FileText className="w-5 h-5 text-[#F02D50]" />,
+      description:
+        'TournX displays an interactive preview of every parsed team, squad roster, and match configuration. If any player name, position, or team detail needs adjustment, edit it directly before confirming.',
+      content: (
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-3 shadow-md text-xs">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
+            <span className="font-bold text-[#F0E9E7]">Coastal Super Cup (Parsed Preview)</span>
+            <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] text-[10px] font-mono font-bold">Editable</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-lg bg-[#0b130e] border border-[#1e3425]">
-              <span className="text-[10px] text-slate-400 block">FORMAT</span>
-              <span className="font-semibold text-slate-200">Single Round-Robin</span>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#A5A1A4] font-mono block">TEAMS DETECTED</span>
+              <span className="font-semibold text-[#F0E9E7]">FC Goa, Chennaiyin FC</span>
             </div>
-            <div className="p-2.5 rounded-lg bg-[#0b130e] border border-[#1e3425]">
-              <span className="text-[10px] text-slate-400 block">TEAMS</span>
-              <span className="font-semibold text-slate-200">6 Clubs (15 Fixtures)</span>
-            </div>
-            <div className="p-2.5 rounded-lg bg-[#0b130e] border border-[#1e3425] flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="text-slate-200 truncate">Nov 15, 2026</span>
-            </div>
-            <div className="p-2.5 rounded-lg bg-[#0b130e] border border-[#1e3425] flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="text-slate-200 truncate">Kannur Stadium</span>
+            <div className="p-2.5 rounded-lg bg-[#101013] border border-white/10">
+              <span className="text-[10px] text-[#A5A1A4] font-mono block">SQUADS POPULATED</span>
+              <span className="font-semibold text-[#F0E9E7]">8 Players Assigned</span>
             </div>
           </div>
-          <div className="text-[11px] text-emerald-300 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Manual edits in preview override parsed text with 100% fidelity.</span>
+          <div className="text-[11px] text-[#F02D50] flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <span>Manual edits override parsed values with 100% fidelity before fixtures generate.</span>
           </div>
         </div>
       )
     },
+
+    // Step 5: Generating fixtures and managing the tournament
     {
-      title: 'Generate Fixtures & Manage Teams',
-      subtitle: 'Deterministic scheduling and automatic league tables',
-      badge: 'Step 4 of 6',
-      icon: <Users className="w-6 h-6 text-emerald-400" />,
-      description:
-        'Once confirmed, TournX applies the Berger circle rotation algorithm to generate balanced home-and-away round pairings. Standings calculate instantly based on win, draw, and goal difference rules.',
-      content: (
-        <div className="rounded-xl p-4 bg-[#121c15] border border-[#233c2a] space-y-2.5 shadow-sm text-xs">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
-            <span>Round 1 Sample Match</span>
-            <span className="text-emerald-400">Match 1</span>
-          </div>
-          <div className="p-3 rounded-lg bg-[#0b130e] border border-[#1e3425] flex items-center justify-between">
-            <span className="font-bold text-slate-100">Kerala Blasters</span>
-            <span className="px-2 py-0.5 rounded bg-[#16291d] font-mono text-emerald-400 text-xs font-bold">VS</span>
-            <span className="font-bold text-slate-100">Bengaluru FC</span>
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-            <span>Points: Win (3) • Draw (1) • Loss (0)</span>
-            <span>Tie-breakers: Goal Diff &rarr; Goals For</span>
-          </div>
-        </div>
-      )
-    },
-    {
-      title: 'Invite Participants & Share Access',
-      subtitle: 'Instant public viewing and restricted modifier roles',
+      title: 'Generating Fixtures & Managing the Tournament',
+      subtitle: 'Deterministic scheduling, ground overview, and standings',
       badge: 'Step 5 of 6',
-      icon: <Key className="w-6 h-6 text-emerald-400" />,
+      icon: <Shield className="w-5 h-5 text-[#F02D50]" />,
       description:
-        'Every tournament includes a unique shareable link and access code. Public spectators and players can view fixtures and standings without registering an account. Modifiers with a score code can update scores only.',
+        'Upon confirmation, TournX generates balanced match rounds, top-down football ground diagrams for your selected format (5v5 to 11v11), and real-time standings with goal difference tie-breakers.',
       content: (
-        <div className="rounded-xl p-4 bg-[#121c15] border border-[#233c2a] space-y-3 shadow-sm text-xs">
-          <div className="p-3 rounded-lg bg-[#0b130e] border border-[#1e3425] space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5 text-blue-400" /> Public Viewer Access
-              </span>
-              <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 font-mono text-[10px]">Read Only</span>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              Shareable link or 6-digit code. Cannot edit matches, players, or settings.
-            </p>
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-2.5 shadow-md text-xs">
+          <div className="flex items-center justify-between text-[11px] font-mono font-semibold text-[#A5A1A4]">
+            <span>Round 1 Balanced Fixture</span>
+            <span className="text-[#F02D50]">Match 1</span>
           </div>
-          <div className="p-3 rounded-lg bg-[#0b130e] border border-[#1e3425] space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-amber-400" /> Matchday Score Modifier
-              </span>
-              <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 font-mono text-[10px]">Score Only</span>
-            </div>
-            <p className="text-[11px] text-slate-400 leading-tight">
-              Restricted to inputting match scores, goalscorers, and Player of the Match awards.
-            </p>
+          <div className="p-3 rounded-lg bg-[#101013] border border-white/10 flex items-center justify-between">
+            <span className="font-bold text-[#F0E9E7]">FC Goa</span>
+            <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 font-mono text-[#F02D50] text-xs font-bold">VS</span>
+            <span className="font-bold text-[#F0E9E7]">Chennaiyin FC</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-[#A5A1A4] pt-1 font-mono">
+            <span>Points: Win (3) • Draw (1) • Loss (0)</span>
+            <span>Pitch: 5-a-side Official (40m x 20m)</span>
           </div>
         </div>
       )
     },
+
+    // Step 6: Sharing access and updating matches
     {
-      title: 'Update Matches & Track Leaders',
-      subtitle: 'Upcoming, Live, and Completed statuses with POTM voting',
+      title: 'Sharing Access & Live Match Updates',
+      subtitle: 'Spectator view, scorekeeper codes, and POTM honors',
       badge: 'Step 6 of 6',
-      icon: <Activity className="w-6 h-6 text-emerald-400" />,
+      icon: <Activity className="w-5 h-5 text-[#F02D50]" />,
       description:
-        'During the tournament, update match statuses, record goals and assists with exact match minutes, and designate Player of the Match honors. Leaderboards update in real-time.',
+        'Share deep links or access codes for the public scoreboard view. Modifiers update match scores and log goal events live, with real-time Player of the Match awards and leaderboard updates.',
       content: (
-        <div className="rounded-xl p-4 bg-[#121c15] border border-[#233c2a] space-y-3 shadow-sm text-xs">
-          <div className="p-3 rounded-lg bg-[#0b130e] border border-[#1e3425] flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-rose-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" /> LIVE • 42'
+        <div className="rounded-xl p-4 bg-[#141418] border border-white/10 space-y-3 shadow-md text-xs">
+          <div className="p-3 rounded-lg bg-[#101013] border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[#F0E9E7] flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-[#F02D50]" /> Public Observer Experience
               </span>
-              <p className="font-bold text-slate-100 mt-0.5">Kerala Blasters vs Bengaluru FC</p>
+              <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] font-mono text-[10px]">Neo-Retro View</span>
             </div>
-            <div className="text-right">
-              <span className="font-mono text-base font-extrabold text-emerald-400">2 - 1</span>
-              <span className="block text-[10px] text-slate-400">Kannur Stadium</span>
-            </div>
+            <p className="text-[11px] text-[#A5A1A4] leading-tight">
+              Instant access without registration. Clean block-style scorecards, standings, and squad sheets.
+            </p>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-300 px-1">
-            <span>Goalscorers: Rohan Krishna (18'), Abin Thomas (34')</span>
-            <span className="text-emerald-400 font-semibold">POTM Active</span>
+          <div className="p-3 rounded-lg bg-[#101013] border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[#F0E9E7] flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-amber-400" /> Scorekeeper Modifier Code
+              </span>
+              <span className="px-2 py-0.5 rounded bg-amber-950/60 border border-amber-800/40 text-amber-300 font-mono text-[10px]">Restricted Role</span>
+            </div>
+            <p className="text-[11px] text-[#A5A1A4] leading-tight">
+              Designated match officials can input live scores and goalscorers without touching tournament settings.
+            </p>
           </div>
         </div>
       )
@@ -238,108 +259,122 @@ export const InteractiveTutorialModal: React.FC<InteractiveTutorialModalProps> =
   const currentStepData = steps[currentStep];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl bg-[#0f1712] border border-[#233c2a] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl bg-[#19191F] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-[#F0E9E7]">
         
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-[#233c2a] bg-[#121c15] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#162e20] border border-[#2c5339] flex items-center justify-center">
-              {currentStepData.icon}
-            </div>
-            <div>
-              <span className="text-[10px] font-semibold tracking-wider uppercase text-emerald-400">
-                {currentStepData.badge}
-              </span>
-              <h3 className="text-sm font-bold text-[#faf9f5]">
-                {currentStepData.title}
-              </h3>
-            </div>
+        {/* Modal Top Bar */}
+        <div className="flex items-center justify-between px-5 py-4 bg-[#141418] border-b border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] text-[11px] font-mono font-bold tracking-wider uppercase">
+              {currentStepData.badge}
+            </span>
+            <span className="text-xs text-[#A5A1A4] font-medium hidden sm:inline">
+              Interactive Guide
+            </span>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2e22] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-[#A5A1A4] hover:text-white hover:bg-white/10 transition cursor-pointer"
             aria-label="Close tutorial"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Body content */}
-        <div className="p-5 overflow-y-auto space-y-4 flex-1">
-          <p className="text-xs text-slate-300 leading-relaxed">
+        {/* Modal Body */}
+        <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-xl bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] shrink-0">
+              {currentStepData.icon}
+            </div>
+            <div>
+              <h3 className="text-lg font-bold font-display text-[#F0E9E7]">
+                {currentStepData.title}
+              </h3>
+              <p className="text-xs text-[#F02D50] font-medium mt-0.5">
+                {currentStepData.subtitle}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#A5A1A4] font-sans leading-relaxed">
             {currentStepData.description}
           </p>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.18 }}
-            >
-              {currentStepData.content}
-            </motion.div>
-          </AnimatePresence>
+          {/* Interactive visual content */}
+          <div className="pt-1">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+              >
+                {currentStepData.content}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* Footer controls & Progress */}
-        <div className="px-5 py-3.5 border-t border-[#233c2a] bg-[#121c15] flex items-center justify-between">
-          <button
-            onClick={onClose}
-            className="text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer"
-          >
-            Skip Tutorial
-          </button>
-
-          {/* Dots Indicator */}
+        {/* Modal Footer Controls */}
+        <div className="px-5 py-3.5 bg-[#141418] border-t border-white/[0.08] flex items-center justify-between gap-3">
+          {/* Progress Dots */}
           <div className="flex items-center gap-1.5">
             {steps.map((_, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => setCurrentStep(idx)}
-                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
-                  idx === currentStep
-                    ? 'w-6 bg-emerald-400'
-                    : 'bg-[#25422f] hover:bg-[#345c41]'
+                className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                  currentStep === idx
+                    ? 'w-6 bg-[#F02D50]'
+                    : 'w-1.5 bg-white/20 hover:bg-white/40'
                 }`}
-                aria-label={`Go to step ${idx + 1}`}
+                aria-label={`Jump to step ${idx + 1}`}
               />
             ))}
           </div>
 
-          {/* Navigation Controls */}
+          {/* Navigation Controls: Back, Skip, Next / Done */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-white/5 transition cursor-pointer"
+            >
+              Skip
+            </button>
+
             {currentStep > 0 && (
               <button
-                onClick={() => setCurrentStep(prev => prev - 1)}
-                className="px-3 py-1.5 rounded-lg bg-[#18281d] hover:bg-[#203627] text-slate-200 text-xs font-semibold flex items-center gap-1 border border-[#2b4b34] transition cursor-pointer"
+                type="button"
+                onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                className="px-3 py-1.5 rounded-lg bg-[#19191F] hover:bg-[#202028] border border-white/10 text-xs text-[#F0E9E7] transition flex items-center gap-1 cursor-pointer font-medium"
               >
-                <ChevronLeft className="w-3.5 h-3.5" /> Back
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
               </button>
             )}
 
             {currentStep < steps.length - 1 ? (
               <button
-                onClick={() => setCurrentStep(prev => prev + 1)}
-                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition cursor-pointer"
+                type="button"
+                onClick={() => setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1))}
+                className="px-4 py-1.5 rounded-lg bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-bold transition flex items-center gap-1 shadow-md cursor-pointer"
               >
-                Next <ChevronRight className="w-3.5 h-3.5" />
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             ) : (
               <button
-                onClick={() => {
-                  onClose();
-                  if (onTryPrompt) {
-                    onTryPrompt(samplePrompt);
-                  }
-                }}
-                className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition cursor-pointer"
+                type="button"
+                onClick={onClose}
+                className="px-4 py-1.5 rounded-lg bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-bold transition shadow-md cursor-pointer flex items-center gap-1"
               >
-                <span>Get Started</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <span>Got It</span>
+                <Check className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

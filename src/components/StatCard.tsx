@@ -31,21 +31,21 @@ export const StatCard: React.FC<StatCardProps> = ({
   const playersMap = React.useMemo(() => new Map(allPlayers.map(p => [p.id, p])), [allPlayers]);
 
   return (
-    <div className="rounded-xl bg-white border border-slate-200 overflow-hidden shadow-xs flex flex-col">
+    <div className="rounded-2xl bg-[#19191F] border border-white/10 overflow-hidden shadow-xl flex flex-col">
       {/* Header */}
-      <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+      <div className="p-4 bg-[#141418] border-b border-white/[0.08] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+          <div className="w-8 h-8 rounded-lg bg-[#21191D] border border-[#F02D50]/40 flex items-center justify-center text-[#F02D50]">
             <Icon className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="font-extrabold text-sm text-slate-900 uppercase tracking-tight">
+            <h3 className="font-extrabold text-sm text-[#F0E9E7] uppercase tracking-tight font-display">
               {title}
             </h3>
-            <p className="text-[11px] text-slate-500">{subtitle}</p>
+            <p className="text-[11px] text-[#A5A1A4]">{subtitle}</p>
           </div>
         </div>
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+        <span className="text-[10px] font-mono font-bold text-[#A5A1A4] uppercase tracking-wider">
           {valueLabel}
         </span>
       </div>
@@ -60,7 +60,7 @@ export const StatCard: React.FC<StatCardProps> = ({
             className="border-0 bg-transparent py-8"
           />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-white/[0.05]">
             {entries.slice(0, 10).map((entry, index) => {
               const rank = index + 1;
               const isLeader = rank === 1;
@@ -68,15 +68,15 @@ export const StatCard: React.FC<StatCardProps> = ({
               return (
                 <div
                   key={entry.player_id}
-                  className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${
-                    isLeader ? 'bg-amber-50/50' : 'hover:bg-slate-50'
+                  className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${
+                    isLeader ? 'bg-[#21191D]/40 border border-[#F02D50]/30' : 'hover:bg-[#202028]'
                   } ${onSelectPlayer ? 'cursor-pointer group' : ''}`}
                   onClick={() => onSelectPlayer?.(entry.player_id)}
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`font-extrabold text-base w-6 text-center ${
-                        isLeader ? 'text-amber-600' : 'text-slate-400'
+                      className={`font-score font-bold text-base w-6 text-center ${
+                        isLeader ? 'text-[#F02D50]' : 'text-[#A5A1A4]'
                       }`}
                     >
                       {rank}
@@ -93,21 +93,21 @@ export const StatCard: React.FC<StatCardProps> = ({
                     )}
 
                     <div className="min-w-0">
-                      <span className="font-bold text-xs sm:text-sm text-slate-900 block truncate group-hover:text-emerald-700 transition-colors">
+                      <span className="font-bold text-xs sm:text-sm text-[#F0E9E7] block truncate group-hover:text-[#F02D50] transition-colors">
                         {entry.player_name}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-medium truncate block">
+                      <span className="text-[10px] text-[#A5A1A4] font-mono truncate block">
                         {entry.team.name}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-base text-slate-900 font-mono">
+                    <span className="font-score font-extrabold text-base text-[#F02D50]">
                       {entry.value}
                     </span>
                     {onSelectPlayer && (
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-700 group-hover:translate-x-0.5 transition-all" />
+                      <ChevronRight className="w-3.5 h-3.5 text-[#A5A1A4] group-hover:text-[#F02D50] group-hover:translate-x-0.5 transition-all" />
                     )}
                   </div>
                 </div>

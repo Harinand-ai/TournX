@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Trash2, ArrowRight, AlertTriangle, AlertCircle, Clock, Users, Trophy } from 'lucide-react';
+import { X, FileText, Trash2, ArrowRight, AlertTriangle, AlertCircle, Clock, Users, Check } from 'lucide-react';
 import { tournamentService } from '../../services/tournamentService';
 import { TournamentDraftRecord } from '../../services/localDataService';
 
@@ -18,13 +18,20 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
 }) => {
   const [drafts, setDrafts] = useState<TournamentDraftRecord[]>([]);
   const [draftToDelete, setDraftToDelete] = useState<TournamentDraftRecord | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const loadDrafts = () => {
+  const loadDrafts = async () => {
+    setIsLoading(true);
     try {
-      const list = tournamentService.getDrafts();
+      const list = await tournamentService.getDraftsAsync();
       setDrafts(list);
     } catch {
-      setDrafts([]);
+      setDrafts(tournamentService.getDrafts());
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -32,18 +39,43 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
     if (isOpen) {
       loadDrafts();
       setDraftToDelete(null);
+      setShowDeleteAllConfirm(false);
+      setNotice(null);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDeleteIndividual = async () => {
     if (!draftToDelete) return;
-    tournamentService.deleteDraft(draftToDelete.id);
-    setDraftToDelete(null);
-    loadDrafts();
-    if (onDraftsChanged) {
-      onDraftsChanged();
+    setIsDeleting(true);
+    try {
+      await tournamentService.deleteDraft(draftToDelete.id);
+      setNotice(`Deleted draft "${draftToDelete.name || 'Draft'}".`);
+      setDraftToDelete(null);
+      loadDrafts();
+      if (onDraftsChanged) onDraftsChanged();
+    } catch (err: any) {
+      setNotice(`Failed to delete draft: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setNotice(null), 3000);
+    }
+  };
+
+  const handleConfirmDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await tournamentService.deleteAllDrafts();
+      setShowDeleteAllConfirm(false);
+      loadDrafts();
+      setNotice(`Successfully deleted all ${res.localCount + res.cloudCount} saved drafts.`);
+      if (onDraftsChanged) onDraftsChanged();
+    } catch (err: any) {
+      setNotice(`Failed to delete drafts: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setNotice(null), 3500);
     }
   };
 
@@ -57,42 +89,113 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-[#111827] border border-[#1f293d] rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden text-[#f8fafc]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl bg-[#15151B] border-2 border-[#262633] shadow-[4px_4px_0px_#070709] flex flex-col max-h-[85vh] overflow-hidden text-[#F0E9E7]">
         
         {/* Title Bar */}
-        <div className="flex items-center justify-between px-5 py-4 bg-[#0d1424] border-b border-[#1f293d]">
+        <div className="flex items-center justify-between px-5 py-4 bg-[#121217] border-b-2 border-[#262633]">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-[#162032] border border-[#2b3a54] text-emerald-400">
-              <FileText className="w-4 h-4 text-emerald-400" />
+            <div className="p-1.5 border border-[#F02D50]/40 bg-[#22161A] text-[#F02D50]">
+              <FileText className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-[#f8fafc]">
-                Saved Tournament Drafts
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Continue editing or manage previously drafted tournaments
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-pixel font-bold text-[#F0E9E7]">
+                  SAVED TOURNAMENT DRAFTS
+                </h2>
+                {drafts.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-[#F02D50]/20 text-[#F02D50] text-[10px] font-pixel font-bold border border-[#F02D50]/40">
+                    [{drafts.length}]
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-[#A5A1A4] font-sans">
+                Resume editing or manage previously drafted tournaments
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#162032] transition cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {drafts.length > 0 && !showDeleteAllConfirm && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllConfirm(true)}
+                className="px-2.5 py-1.5 border border-rose-800 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 text-xs font-pixel transition cursor-pointer flex items-center gap-1.5 shadow-[1px_1px_0px_#070709]"
+                title="Delete all drafts"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">DELETE ALL</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-[#202028] transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Notice Banner */}
+        {notice && (
+          <div className="p-3 bg-[#22161A] border-b-2 border-[#F02D50]/40 text-[#F02D50] text-xs font-pixel flex items-center gap-2 animate-in fade-in">
+            <Check className="w-4 h-4 shrink-0" />
+            <span>{notice}</span>
+          </div>
+        )}
+
+        {/* Delete All Drafts Confirmation Banner */}
+        {showDeleteAllConfirm && (
+          <div className="p-4 bg-rose-950/80 border-b-2 border-rose-800 text-xs space-y-2.5 animate-in slide-in-from-top-2">
+            <div className="flex items-start gap-2.5 text-rose-200">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+              <div>
+                <p className="font-pixel font-bold text-rose-100">
+                  Delete all {drafts.length} saved tournament drafts?
+                </p>
+                <p className="text-[11px] text-rose-300 font-sans mt-0.5 leading-relaxed">
+                  This will permanently remove all local draft prompts and user-owned cloud drafts from your account. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllConfirm(false)}
+                disabled={isDeleting}
+                className="px-3 py-1.5 border border-[#262633] hover:bg-[#1E1E26] text-slate-300 font-pixel text-xs cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteAll}
+                disabled={isDeleting}
+                className="px-4 py-1.5 border border-rose-600 bg-rose-600 hover:bg-rose-500 text-white font-pixel font-bold text-xs cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? 'DELETING...' : `CONFIRM DELETE ALL (${drafts.length})`}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Drafts List */}
         <div className="p-4 overflow-y-auto space-y-3 flex-1">
-          {drafts.length === 0 ? (
+          {isLoading && drafts.length === 0 ? (
+            <div className="p-10 text-center space-y-3">
+              <div className="w-8 h-8 rounded-full border-2 border-[#F02D50] border-t-transparent animate-spin mx-auto" />
+              <p className="text-xs font-pixel text-[#A5A1A4]">Loading saved drafts from storage and cloud...</p>
+            </div>
+          ) : drafts.length === 0 ? (
             <div className="p-8 text-center space-y-3">
-              <div className="w-12 h-12 rounded-xl bg-[#162032] border border-[#2b3a54] mx-auto flex items-center justify-center text-slate-400">
-                <FileText className="w-6 h-6 text-slate-400" />
+              <div className="w-12 h-12 border-2 border-[#262633] bg-[#121217] mx-auto flex items-center justify-center text-[#A5A1A4]">
+                <FileText className="w-6 h-6 text-[#A5A1A4]" />
               </div>
-              <h3 className="text-sm font-semibold text-slate-200">No Drafts Saved</h3>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto font-sans leading-relaxed">
+              <h3 className="text-sm font-pixel font-bold text-[#F0E9E7]">NO DRAFTS SAVED</h3>
+              <p className="text-xs text-[#A5A1A4] max-w-xs mx-auto font-sans leading-relaxed">
                 When you create or save a tournament prompt, it will appear here so you can resume editing anytime.
               </p>
             </div>
@@ -100,20 +203,20 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
             drafts.map(draft => (
               <div
                 key={draft.id}
-                className="p-4 bg-[#0d1424] border border-[#1f293d] hover:border-emerald-500/40 rounded-xl transition space-y-2.5"
+                className="p-4 bg-[#101014] border-2 border-[#262633] hover:border-[#F02D50] transition space-y-2.5 shadow-[2px_2px_0px_#070709]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-[#f8fafc] truncate">
+                      <span className="font-pixel font-bold text-xs text-[#F0E9E7] truncate">
                         {draft.name || 'Untitled Tournament Draft'}
                       </span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-950/60 border border-amber-800/60 text-amber-300 shrink-0">
-                        Draft
+                      <span className="px-2 py-0.5 text-[10px] font-pixel font-bold uppercase bg-[#22161A] border border-[#F02D50]/40 text-[#F02D50] shrink-0">
+                        {(draft as any).isCloud ? 'Cloud Draft' : 'Draft'}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-400 line-clamp-2 mt-1.5 font-sans leading-relaxed">
+                    <p className="text-xs text-[#A5A1A4] line-clamp-2 mt-1.5 font-sans leading-relaxed">
                       "{draft.prompt}"
                     </p>
                   </div>
@@ -121,23 +224,23 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDraftToDelete(draft)}
-                    className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition cursor-pointer shrink-0"
+                    className="p-1.5 text-[#A5A1A4] hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer shrink-0"
                     title="Delete draft"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#1f293d] text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#1E1E28] text-xs text-[#A5A1A4] font-pixel">
                   <div className="flex items-center gap-3">
                     <span className="flex items-center gap-1 text-[11px]">
-                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <Clock className="w-3.5 h-3.5 text-[#F02D50]" />
                       <span>{formatTimestamp(draft.updated_at)}</span>
                     </span>
                     {draft.teamsCount > 0 && (
-                      <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                      <span className="flex items-center gap-1 text-[11px] text-[#F0E9E7] font-medium">
                         <Users className="w-3.5 h-3.5" />
-                        <span>{draft.teamsCount} Teams</span>
+                        <span>[{draft.teamsCount} TEAMS]</span>
                       </span>
                     )}
                   </div>
@@ -148,10 +251,10 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
                       onSelectDraft(draft);
                       onClose();
                     }}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    className="px-3 py-1.5 border-2 border-[#F02D50] bg-[#F02D50] hover:bg-[#FF385C] text-white text-xs font-pixel font-bold flex items-center gap-1.5 transition cursor-pointer shadow-[2px_2px_0px_#070709]"
                   >
-                    <span>Continue Editing</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>RESUME</span>
+                    <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -159,53 +262,30 @@ export const DraftsModal: React.FC<DraftsModalProps> = ({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 bg-[#0d1424] border-t border-[#1f293d] flex items-center justify-between text-xs text-slate-400">
-          <span>{drafts.length} draft{drafts.length === 1 ? '' : 's'} stored locally</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3.5 py-1.5 rounded-lg border border-[#2b3a54] bg-[#162032] hover:bg-[#1e2c44] text-slate-300 hover:text-white transition cursor-pointer"
-          >
-            Close
-          </button>
-        </div>
-
-        {/* IN-MODAL DRAFT DELETION CONFIRMATION */}
+        {/* Delete Single Draft Confirmation Overlay */}
         {draftToDelete && (
-          <div className="absolute inset-0 z-20 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="w-full max-w-sm bg-[#111827] rounded-2xl border border-rose-800/80 shadow-2xl p-5 space-y-4 text-[#f8fafc]">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-400">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-[#f8fafc]">Delete Draft?</h3>
-                  <p className="text-[11px] text-slate-400">This action cannot be undone</p>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                Are you sure you want to permanently delete draft <span className="font-semibold text-emerald-400">"{draftToDelete.name || 'Untitled Draft'}"</span>?
-              </p>
-
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1f293d]">
-                <button
-                  type="button"
-                  onClick={() => setDraftToDelete(null)}
-                  className="px-3.5 py-1.5 rounded-lg border border-[#2b3a54] bg-[#162032] hover:bg-[#1e2c44] text-xs font-medium text-slate-300 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Draft</span>
-                </button>
-              </div>
+          <div className="p-4 bg-[#21191D] border-t border-rose-900/50 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-rose-300">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+              <span>Delete "{draftToDelete.name || 'Draft'}"?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDraftToDelete(null)}
+                disabled={isDeleting}
+                className="px-3 py-1 rounded-lg border border-white/10 hover:bg-white/5 text-[#A5A1A4] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteIndividual}
+                disabled={isDeleting}
+                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         )}

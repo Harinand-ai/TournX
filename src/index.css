@@ -3,24 +3,39 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-obsidian: #101013;
+    --color-charcoal: #19191F;
+    --color-burgundy: #21191D;
+    --color-crimson: #F02D50;
+    --color-crimson-vivid: #F02D50;
+    --color-crimson-deep: #991B35;
+    --color-silver: #F0E9E7;
+    --color-muted: #A5A1A4;
+    --border-subtle: rgba(240, 233, 231, 0.08);
+    --border-strong: rgba(240, 233, 231, 0.16);
+    --border-crimson: rgba(240, 45, 80, 0.4);
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
-    background-color: #faf9f5;
-    color: #0f1712;
+    background-color: #101013;
+    color: #F0E9E7;
   }
 
   body {
-    background-color: #faf9f5 !important;
-    color: #0f1712 !important;
+    background-color: #101013 !important;
+    color: #F0E9E7 !important;
     min-height: 100vh;
-    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    selection-background-color: rgba(21, 128, 61, 0.15);
-    selection-color: #14532d;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
+    selection-background-color: rgba(240, 45, 80, 0.35);
+    selection-color: #F0E9E7;
+    letter-spacing: -0.01em;
   }
 
   ::placeholder {
-    color: #8a968d;
+    color: #6E6A6D;
     opacity: 1;
   }
 
@@ -34,21 +49,40 @@
 }
 
 /* ==========================================================================
-   TOURNX EDITORIAL DESIGN SYSTEM (Minimalist Warm Ivory & Deep Forest)
+   TOURNX ARCHITECTURAL DESIGN SYSTEM: PREMIUM OBSIDIAN & CRIMSON
    ========================================================================== */
 
-/* Typography & Layout Tokens */
-.font-editorial-num {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+/* Expressive Typography Tokens */
+.font-display-title {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+
+.font-editorial-num,
+.font-score-num {
+  font-family: 'Space Grotesk', 'JetBrains Mono', sans-serif;
   font-feature-settings: "tnum" 1, "cv05" 1;
   letter-spacing: -0.04em;
   font-weight: 800;
+}
+
+.font-label-mono {
+  font-family: 'JetBrains Mono', 'Space Grotesk', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* 3D Perspective Transformations */
 .perspective-1200 {
   perspective: 1200px;
   -webkit-perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.perspective-800 {
+  perspective: 800px;
+  -webkit-perspective: 800px;
   transform-style: preserve-3d;
 }
 
@@ -62,162 +96,156 @@
   -webkit-backface-visibility: hidden;
 }
 
-/* Editorial Minimalist Surfaces */
-.editorial-canvas {
-  background-color: #faf9f5;
-  color: #0f1712;
+/* Obsidian & Crimson Architectural Surfaces */
+.obsidian-canvas {
+  background-color: #101013;
+  color: #F0E9E7;
 }
 
-.editorial-card {
-  background-color: #ffffff;
-  border: 1px solid #e5e3d8;
+.obsidian-card {
+  background-color: #19191F;
+  border: 1px solid rgba(240, 233, 231, 0.08);
+  border-radius: 0.875rem;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+}
+
+.obsidian-card-interactive {
+  background-color: #19191F;
+  border: 1px solid rgba(240, 233, 231, 0.08);
+  border-radius: 0.875rem;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.obsidian-card-interactive:hover {
+  border-color: rgba(240, 45, 80, 0.35);
+  background-color: #201F28;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(240, 45, 80, 0.08);
+}
+
+.obsidian-card-subtle {
+  background-color: #141418;
+  border: 1px solid rgba(240, 233, 231, 0.06);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
 }
 
-.editorial-card-subtle {
-  background-color: #f5f4ee;
-  border: 1px solid #e2dfd5;
-  border-radius: 0.75rem;
+.obsidian-card-burgundy {
+  background-color: #21191D;
+  border: 1px solid rgba(240, 45, 80, 0.22);
+  border-radius: 0.875rem;
+  box-shadow: 0 6px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
-.editorial-card-dark {
-  background-color: #0f1712;
-  color: #faf9f5;
-  border: 1px solid #1f2e24;
-  border-radius: 0.75rem;
+.obsidian-card-live {
+  background-color: #1C1418;
+  border: 1px solid rgba(240, 45, 80, 0.5);
+  border-radius: 0.875rem;
+  box-shadow: 0 4px 24px -2px rgba(240, 45, 80, 0.2), inset 0 0 20px rgba(240, 45, 80, 0.05);
 }
 
-/* Editorial Buttons */
-.editorial-btn-primary {
-  background-color: #0f1712;
-  color: #ffffff;
-  border: 1px solid #0f1712;
+/* Architectural Buttons */
+.btn-crimson-primary {
+  background-color: #F02D50;
+  color: #F0E9E7;
+  border: 1px solid #F02D50;
   border-radius: 0.625rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: all 0.18s ease;
   cursor: pointer;
+  box-shadow: 0 2px 10px rgba(240, 45, 80, 0.25);
 }
-.editorial-btn-primary:hover {
-  background-color: #1e2c22;
-  border-color: #1e2c22;
-}
-
-.editorial-btn-accent {
-  background-color: #15803d;
-  color: #ffffff;
-  border: 1px solid #15803d;
-  border-radius: 0.625rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-.editorial-btn-accent:hover {
-  background-color: #166534;
-  border-color: #166534;
-}
-
-.editorial-btn-secondary {
-  background-color: #ffffff;
-  color: #0f1712;
-  border: 1px solid #d5d1c3;
-  border-radius: 0.625rem;
-  font-weight: 600;
-  transition: all 0.15s ease;
-  cursor: pointer;
-}
-.editorial-btn-secondary:hover {
-  background-color: #f5f4ee;
-  border-color: #bcbaae;
-}
-
-/* Compatibility layer for legacy retro/stadium classes */
-.retro-card,
-.stadium-card {
-  background-color: #ffffff;
-  border: 1px solid #e5e3d8;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.04);
-}
-
-.retro-card-interactive,
-.stadium-card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.retro-card-interactive:hover,
-.stadium-card-hover:hover {
-  border-color: #c9c5b6;
-  background-color: #ffffff;
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.06);
+.btn-crimson-primary:hover {
+  background-color: #FF3358;
+  border-color: #FF3358;
+  box-shadow: 0 4px 16px rgba(240, 45, 80, 0.4);
   transform: translateY(-1px);
 }
-
-.retro-card-live,
-.stadium-card-live {
-  background-color: #f7fbf8;
-  border: 1px solid #15803d;
-  border-radius: 0.75rem;
-  box-shadow: 0 2px 8px -2px rgba(21, 128, 61, 0.15);
+.btn-crimson-primary:active {
+  transform: translateY(0);
 }
 
-.retro-btn-primary,
-.stadium-block-btn {
-  background-color: #0f1712;
-  border: 1px solid #0f1712;
-  color: #ffffff;
-  font-weight: 600;
+.btn-obsidian-secondary {
+  background-color: #19191F;
+  color: #F0E9E7;
+  border: 1px solid rgba(240, 233, 231, 0.14);
   border-radius: 0.625rem;
-  transition: all 0.15s ease;
+  font-weight: 600;
+  transition: all 0.18s ease;
   cursor: pointer;
 }
-.retro-btn-primary:hover,
-.stadium-block-btn:hover {
-  background-color: #1e2c22;
-  border-color: #1e2c22;
-  color: #ffffff;
+.btn-obsidian-secondary:hover {
+  background-color: #23232C;
+  border-color: rgba(240, 233, 231, 0.25);
+  color: #FFFFFF;
 }
 
-.retro-btn-secondary {
-  background-color: #ffffff;
-  border: 1px solid #d5d1c3;
-  color: #0f1712;
-  font-weight: 600;
+.btn-burgundy-secondary {
+  background-color: #21191D;
+  color: #F0E9E7;
+  border: 1px solid rgba(240, 45, 80, 0.28);
   border-radius: 0.625rem;
-  transition: all 0.15s ease;
+  font-weight: 600;
+  transition: all 0.18s ease;
   cursor: pointer;
 }
-.retro-btn-secondary:hover {
-  background-color: #f5f4ee;
-  border-color: #bcbaae;
-  color: #0f1712;
+.btn-burgundy-secondary:hover {
+  background-color: #2D2027;
+  border-color: rgba(240, 45, 80, 0.5);
+  color: #FFFFFF;
 }
 
-.retro-input {
-  background-color: #ffffff;
-  border: 1px solid #d5d1c3;
-  color: #0f1712;
+/* Inputs & Form Elements */
+.obsidian-input {
+  background-color: #141418;
+  border: 1px solid rgba(240, 233, 231, 0.1);
+  color: #F0E9E7;
   border-radius: 0.625rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
 }
-.retro-input:focus {
-  border-color: #15803d;
-  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.15);
+.obsidian-input:focus {
+  border-color: #F02D50;
+  background-color: #19191F;
+  box-shadow: 0 0 0 3px rgba(240, 45, 80, 0.2);
 }
 
-/* Minimalist Scrollbar */
+/* Backward compatibility mappings to prevent any layout regressions */
+.editorial-canvas { background-color: #101013; color: #F0E9E7; }
+.editorial-card { background-color: #19191F; border: 1px solid rgba(240, 233, 231, 0.08); border-radius: 0.75rem; }
+.editorial-card-subtle { background-color: #141418; border: 1px solid rgba(240, 233, 231, 0.06); border-radius: 0.75rem; }
+.editorial-card-dark { background-color: #101013; color: #F0E9E7; border: 1px solid rgba(240, 233, 231, 0.1); border-radius: 0.75rem; }
+.editorial-btn-primary { background-color: #F02D50; color: #F0E9E7; border: 1px solid #F02D50; border-radius: 0.625rem; font-weight: 600; cursor: pointer; }
+.editorial-btn-primary:hover { background-color: #FF3358; border-color: #FF3358; }
+.editorial-btn-accent { background-color: #F02D50; color: #F0E9E7; border: 1px solid #F02D50; border-radius: 0.625rem; font-weight: 600; cursor: pointer; }
+.editorial-btn-accent:hover { background-color: #FF3358; border-color: #FF3358; }
+.editorial-btn-secondary { background-color: #19191F; color: #F0E9E7; border: 1px solid rgba(240, 233, 231, 0.14); border-radius: 0.625rem; font-weight: 600; cursor: pointer; }
+.editorial-btn-secondary:hover { background-color: #23232C; }
+
+.retro-card, .stadium-card { background-color: #19191F; border: 1px solid rgba(240, 233, 231, 0.08); border-radius: 0.75rem; }
+.retro-card-interactive, .stadium-card-hover { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.retro-card-interactive:hover, .stadium-card-hover:hover { border-color: rgba(240, 45, 80, 0.35); background-color: #201F28; transform: translateY(-1px); }
+.retro-card-live, .stadium-card-live { background-color: #1C1418; border: 1px solid rgba(240, 45, 80, 0.5); border-radius: 0.75rem; box-shadow: 0 2px 12px rgba(240, 45, 80, 0.25); }
+
+.retro-btn-primary, .stadium-block-btn { background-color: #F02D50; border: 1px solid #F02D50; color: #F0E9E7; font-weight: 600; border-radius: 0.625rem; cursor: pointer; }
+.retro-btn-primary:hover, .stadium-block-btn:hover { background-color: #FF3358; border-color: #FF3358; }
+.retro-btn-secondary { background-color: #19191F; border: 1px solid rgba(240, 233, 231, 0.14); color: #F0E9E7; font-weight: 600; border-radius: 0.625rem; cursor: pointer; }
+.retro-btn-secondary:hover { background-color: #23232C; }
+.retro-input { background-color: #141418; border: 1px solid rgba(240, 233, 231, 0.1); color: #F0E9E7; border-radius: 0.625rem; }
+.retro-input:focus { border-color: #F02D50; box-shadow: 0 0 0 2px rgba(240, 45, 80, 0.2); }
+
+/* Obsidian Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #faf9f5;
+  background: #101013;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d5d1c3;
+  background: #2A2A35;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b5b0a1;
+  background: #3E3E4E;
 }
 
 .safe-bottom {

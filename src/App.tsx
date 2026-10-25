@@ -702,14 +702,14 @@ export function App() {
   // If tournament was explicitly not found
   if (tournamentNotFound) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#faf9f5] text-[#0f1712]">
-        <div className="max-w-md w-full p-6 sm:p-8 text-center space-y-4 rounded-2xl bg-white border border-[#e5e3d8] shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center mx-auto">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#101013] text-[#F0E9E7]">
+        <div className="max-w-md w-full p-6 sm:p-8 text-center space-y-4 rounded-2xl bg-[#19191F] border border-white/10 shadow-2xl">
+          <div className="w-12 h-12 rounded-xl bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] flex items-center justify-center mx-auto">
             <Trophy className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-[#0f1712]">Tournament Unavailable</h1>
-            <p className="text-xs text-[#57635a] mt-1 leading-relaxed">
+            <h1 className="text-lg font-bold text-[#F0E9E7]">Tournament Unavailable</h1>
+            <p className="text-xs text-[#A5A1A4] mt-1 leading-relaxed">
               The tournament link you entered is invalid, has expired, or was removed by its organizer.
             </p>
           </div>
@@ -718,7 +718,7 @@ export function App() {
               setTournamentNotFound(false);
               handleNavigate('landing');
             }}
-            className="w-full py-2.5 rounded-lg bg-[#0f1712] text-white text-xs font-semibold cursor-pointer hover:bg-[#1f2e24] transition"
+            className="w-full py-2.5 rounded-lg bg-[#F02D50] hover:bg-[#b01e37] text-white text-xs font-mono font-bold uppercase tracking-wider cursor-pointer shadow-lg shadow-[#F02D50]/20 transition"
           >
             Return to TournX Home
           </button>
@@ -728,7 +728,11 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#faf9f5] text-[#0f1712] font-sans selection:bg-emerald-900/10 selection:text-emerald-950 relative overflow-x-hidden">
+    <div className={`min-h-screen flex flex-col font-sans relative overflow-x-hidden ${
+      isParticipantRoute 
+        ? 'bg-[#0C0E14] text-[#E2E8F0] selection:bg-[#38B264]/30 selection:text-white' 
+        : 'bg-[#101013] text-[#F0E9E7] selection:bg-[#F02D50]/30 selection:text-white'
+    }`}>
 
       {/* Animated Opening Sequence (Optional if intro=true) */}
       {showIntro && (

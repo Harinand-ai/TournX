@@ -12,7 +12,7 @@ describe('TournX — Tournament Flow, Access Code Resolution & 3D Transitions Re
     it('resolves valid access code to its exact matching tournament and sets role strictly', async () => {
       // Create Tournament Alpha
       const tourneyAlpha = localDataService.createTournament({
-        name: 'Kerala Blasters Invitational',
+        name: 'Coastal Champions Invitational',
         season: '2026',
         rules_config: {
           points_for_win: 3,
@@ -44,7 +44,7 @@ describe('TournX — Tournament Flow, Access Code Resolution & 3D Transitions Re
       const resAlpha = await tournamentService.resolveAccessCode(codeAlpha.rawCode);
       expect(resAlpha.success).toBe(true);
       expect(resAlpha.tournament?.id).toBe(tourneyAlpha.id);
-      expect(resAlpha.tournament?.name).toBe('Kerala Blasters Invitational');
+      expect(resAlpha.tournament?.name).toBe('Coastal Champions Invitational');
       expect(resAlpha.role).toBe('VIEW');
       expect(localDataService.getActiveTournamentId()).toBe(tourneyAlpha.id);
 

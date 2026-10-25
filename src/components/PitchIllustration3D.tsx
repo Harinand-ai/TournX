@@ -13,38 +13,39 @@ export const PitchIllustration3D: React.FC<PitchIllustration3DProps> = ({
 
   return (
     <div 
-      className={`relative w-full overflow-hidden rounded-2xl bg-[#0d1610] border border-[#1e3425] shadow-lg flex items-center justify-center select-none ${
+      className={`relative w-full overflow-hidden rounded-2xl bg-[#141419] border border-white/10 shadow-2xl flex items-center justify-center select-none ${
         isCompact ? 'h-32' : 'h-44 sm:h-52'
       } ${className}`}
-      style={{ perspective: '800px' }}
+      style={{ perspective: '900px' }}
       aria-hidden="true"
     >
-      {/* Stadium Floodlight Ambiance Glow */}
-      <div className="absolute inset-0 bg-radial from-emerald-600/15 via-[#0e1d13]/60 to-[#09110c] pointer-events-none" />
+      {/* Stadium Atmosphere & Crimson Perimeter Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(33,25,29,0.8)_0%,_rgba(25,25,31,0.6)_50%,_#101013_100%)] pointer-events-none" />
+      <div className="absolute top-0 inset-x-0 h-10 bg-gradient-to-b from-[#F02D50]/15 to-transparent pointer-events-none" />
 
-      {/* 3D Angled Pitch Canvas */}
+      {/* 3D Angled Pitch Canvas with Hardware-Accelerated Perspective Tilt */}
       <div 
-        className="relative w-[92%] sm:w-[84%] h-[82%] rounded-xl overflow-hidden shadow-2xl border-2 border-emerald-500/30 transition-transform duration-700 ease-out hover:rotate-x-[26deg]"
+        className="relative w-[92%] sm:w-[84%] h-[82%] rounded-xl overflow-hidden border border-[#F02D50]/35 shadow-[0_16px_36px_rgba(0,0,0,0.8),0_0_20px_rgba(240, 45, 80,0.15)] transition-transform duration-700 ease-out hover:rotate-x-[24deg]"
         style={{
-          transform: 'rotateX(30deg) translateZ(0)',
+          transform: 'rotateX(28deg) translateZ(0)',
           transformOrigin: '50% 100%',
-          background: 'linear-gradient(to bottom, #133a22 0%, #174d2c 50%, #123720 100%)',
+          background: 'linear-gradient(to bottom, #1D1C22 0%, #17161C 50%, #121216 100%)',
         }}
       >
-        {/* Alternating Pitch Grass Stripes */}
-        <div className="absolute inset-0 flex flex-col opacity-25">
+        {/* Alternating Architectural Pitch Mowing Stripes */}
+        <div className="absolute inset-0 flex flex-col opacity-30">
           {Array.from({ length: 8 }).map((_, i) => (
             <div 
               key={i} 
-              className={`flex-1 ${i % 2 === 0 ? 'bg-black/25' : 'bg-white/10'}`} 
+              className={`flex-1 ${i % 2 === 0 ? 'bg-black/35' : 'bg-white/5'}`} 
             />
           ))}
         </div>
 
-        {/* Pitch Field Markings (SVG overlay) */}
+        {/* Pitch Field Markings (SVG overlay with Soft Silver Lines) */}
         <svg 
-          className="absolute inset-0 w-full h-full stroke-emerald-300/40 fill-none" 
-          strokeWidth="1.5"
+          className="absolute inset-0 w-full h-full stroke-[#F0E9E7]/40 fill-none" 
+          strokeWidth="1.25"
           viewBox="0 0 100 65" 
           preserveAspectRatio="none"
         >
@@ -56,19 +57,19 @@ export const PitchIllustration3D: React.FC<PitchIllustration3DProps> = ({
 
           {/* Center Circle & Spot */}
           <circle cx="50" cy="32.5" r="9" />
-          <circle cx="50" cy="32.5" r="0.8" className="fill-emerald-300/60" />
+          <circle cx="50" cy="32.5" r="0.8" className="fill-[#F02D50]" stroke="none" />
 
           {/* Left Penalty Area & Goal Area */}
           <rect x="3" y="15" width="16" height="35" />
           <rect x="3" y="23" width="6" height="19" />
           <path d="M 19 26 A 7 7 0 0 1 19 39" />
-          <circle cx="12" cy="32.5" r="0.6" className="fill-emerald-300/60" />
+          <circle cx="12" cy="32.5" r="0.6" className="fill-[#F0E9E7]/80" stroke="none" />
 
           {/* Right Penalty Area & Goal Area */}
           <rect x="81" y="15" width="16" height="35" />
           <rect x="91" y="23" width="6" height="19" />
           <path d="M 81 26 A 7 7 0 0 0 81 39" />
-          <circle cx="88" cy="32.5" r="0.6" className="fill-emerald-300/60" />
+          <circle cx="88" cy="32.5" r="0.6" className="fill-[#F0E9E7]/80" stroke="none" />
 
           {/* Corner Arcs */}
           <path d="M 3 6 A 3 3 0 0 0 6 3" />
@@ -77,18 +78,18 @@ export const PitchIllustration3D: React.FC<PitchIllustration3DProps> = ({
           <path d="M 97 59 A 3 3 0 0 0 94 62" />
         </svg>
 
-        {/* Subtle Pitch Sunlight Highlight */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none" />
+        {/* Ambient Specular Glass Sheen */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#F0E9E7]/5 to-[#F02D50]/10 pointer-events-none" />
       </div>
 
-      {/* Floating Tactical Depth Header */}
-      <div className="absolute bottom-2.5 left-4 right-4 flex items-center justify-between text-[11px] text-emerald-300/90 font-sans tracking-wide">
-        <span className="flex items-center gap-1.5 font-medium">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Official Match Pitch
+      {/* Tactical Stadium Footnote */}
+      <div className="absolute bottom-2.5 left-4 right-4 flex items-center justify-between text-[11px] text-[#A5A1A4] font-mono tracking-wide">
+        <span className="flex items-center gap-1.5 text-[#F0E9E7]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#F02D50] animate-pulse" />
+          Match Pitch Canvas
         </span>
-        <span className="text-slate-400 text-[10px]">
-          Fifa Standard 11v11 / 7v7 / 5v5 Geometry
+        <span className="text-[#A5A1A4] text-[10px]">
+          FIFA Standard 11v11 / 7v7 / 5v5 Geometry
         </span>
       </div>
     </div>

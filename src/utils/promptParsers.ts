@@ -328,6 +328,15 @@ export function cleanTeamToken(raw: string): string {
     return '';
   }
 
+  // Strip Team 1: or Team A: prefix when followed by team name (e.g. "Team 1: FC Goa" -> "FC Goa")
+  const teamPrefixMatch = cleaned.match(/^(?:(?:team\s*(?:[0-9]+|[a-zA-Z])|\d+[\.\)])\s*[:\-–—]\s*)(.+)$/i);
+  if (teamPrefixMatch && teamPrefixMatch[1]) {
+    const afterPrefix = teamPrefixMatch[1].trim();
+    if (afterPrefix.length >= 2 && !/^(?:players?|squad|roster|manager|coach|captain)/i.test(afterPrefix)) {
+      cleaned = afterPrefix;
+    }
+  }
+
   // Single letter check (e.g. "A", "B", "C", "D")
   if (/^[a-zA-Z]$/.test(cleaned)) {
     return cleaned.toUpperCase();
@@ -637,6 +646,9 @@ export function isValidTeamCandidate(raw: string): boolean {
     /\b(?:tomorrow|yesterday|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/,
     /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/,
     /\b(?:players?|roster|squad|captain|coach|manager)\b/,
+    /^(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|substitute|sub|bench|reserve|gk|def|mid|fwd)$/i,
+    /\s*[—–\-:,]\s*(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|gk|def|mid|fwd)\b/i,
+    /\((?:gk|def|mid|fwd|goalkeeper|defender|midfielder|forward|captain|sub)\)/i,
     /^\d{1,2}(?::\d{2})?\s*(?:am|pm)$/i,
   ];
 
@@ -679,24 +691,73 @@ function extractBulletItems(text: string): string[] {
 }
 
 /**
- * Extracts candidate teams from multiline input (bulleted or unbulleted plain lines)
+ * Extracts candidate teams from multiline input (structured headings, bulleted or unbulleted plain lines)
  */
 export function extractLineOrBulletTeams(rawText: string): string[] {
-  // First check explicit bullets
-  const bulletItems = extractBulletItems(rawText);
-  if (bulletItems.length >= 2) {
-    const teams: string[] = [];
-    bulletItems.forEach(item => {
-      const cleaned = cleanTeamToken(item);
-      if (cleaned.length >= 1 && !teams.some(t => t.toLowerCase() === cleaned.toLowerCase())) {
-        teams.push(cleaned);
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // 1. First check for structured team section headings:
+  // e.g. "Team 1: FC Goa", "Team A: Chennaiyin FC", "1. FC Goa", "### FC Goa"
+  // where the line represents a team and is often followed by "Players:" or player items
+  const structuredTeams: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Check "Team 1: FC Goa" or "Team A: FC Goa" or "1. FC Goa"
+    const headerMatch = line.match(/^(?:(?:Team\s*(?:[0-9]+|[a-zA-Z])|\d+[\.\)])\s*[:\-–—]\s*|###\s*|\*\*\s*)([A-Za-z0-9\s'&.-]{2,40}?)(?:\*\*|\s*[:\-–—])?$/i);
+    if (headerMatch && headerMatch[1]) {
+      const cand = cleanTeamToken(headerMatch[1]);
+      if (cand && isValidTeamCandidate(cand) && !structuredTeams.some(t => t.toLowerCase() === cand.toLowerCase())) {
+        structuredTeams.push(cand);
+        continue;
       }
-    });
-    if (teams.length >= 2) return teams;
+    }
+
+    // Check if line is a team followed immediately by "Players:" on next line
+    if (i < lines.length - 1 && /^(?:players?|squad|roster)\s*(?:are|include|:|is)?$/i.test(lines[i + 1])) {
+      const cand = cleanTeamToken(line);
+      if (cand && isValidTeamCandidate(cand) && !structuredTeams.some(t => t.toLowerCase() === cand.toLowerCase())) {
+        structuredTeams.push(cand);
+      }
+    }
+  }
+  if (structuredTeams.length >= 2) {
+    return structuredTeams;
   }
 
-  // Next check unbulleted multiline list of candidate teams
-  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+  // 2. Next check explicit bullets (excluding player entries with positions or bullets under Players:)
+  let insidePlayersSection = false;
+  const candidateBulletTeams: string[] = [];
+  for (const line of lines) {
+    if (/^(?:players?|squad|roster|team\s+members?)\s*(?:are|include|:|is)?$/i.test(line)) {
+      insidePlayersSection = true;
+      continue;
+    }
+    // If a new team header or section starts, reset insidePlayersSection
+    if (/^(?:team\s*(?:[0-9]+|[a-zA-Z])|\d+[\.\)])\s*[:\-–—]/i.test(line) || /^###/i.test(line)) {
+      insidePlayersSection = false;
+    }
+
+    const bulletMatch = line.match(/^[-*•–—]\s+(.+)$/) || line.match(/^\(?\d+[.)\]]\s+(.+)$/);
+    if (bulletMatch && bulletMatch[1]) {
+      const item = bulletMatch[1].trim().replace(/[,;]$/, '');
+      // If we are inside a players section OR item contains player position info, skip it!
+      const hasPositionIndicator = /\b(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|gk|def|mid|fwd|cb|lb|rb|cm|st)\b/i.test(item) ||
+        /[—–\-:]\s*(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|gk|def|mid|fwd)/i.test(item) ||
+        /\((?:gk|def|mid|fwd|goalkeeper|defender|midfielder|forward|captain|sub)\)/i.test(item);
+
+      if (!insidePlayersSection && !hasPositionIndicator) {
+        const cleaned = cleanTeamToken(item);
+        if (cleaned && isValidTeamCandidate(cleaned) && !candidateBulletTeams.some(t => t.toLowerCase() === cleaned.toLowerCase())) {
+          candidateBulletTeams.push(cleaned);
+        }
+      }
+    }
+  }
+  if (candidateBulletTeams.length >= 2) {
+    return candidateBulletTeams;
+  }
+
+  // 3. Next check unbulleted multiline list of candidate teams
   if (lines.length >= 2) {
     const candidateTeams: string[] = [];
     for (const line of lines) {
@@ -1443,8 +1504,8 @@ export function normalizePlayerName(rawName: string): string {
   // Strip trailing dashes, colons, commas, semicolons, bullets, asterisks
   name = name.replace(/[\s—–\-*•:,.;#]+$/u, '').trim();
 
-  // Strip leading articles or keywords
-  name = name.replace(/^(?:the\s+|their\s+|a\s+|an\s+|our\s+|captain\s+|player\s+|substitute\s+|sub\s+)/i, '').trim();
+  // Strip leading articles or role prefixes (do not strip 'player' so names like 'Player A', 'Player One' remain intact)
+  name = name.replace(/^(?:the\s+|their\s+|our\s+|captain\s+|substitute\s+|sub\s+)/i, '').trim();
 
   // Strip trailing role or verb phrases if present (e.g. "Abin Thomas is the forward" or "Akhil Mohan are substitutes")
   name = name.replace(/\s+(?:is\s+the|are\s+the|is\s+a|are\s+a|plays?\s+in|plays?|play|are|is)\s*(?:forward|striker|defender|midfielder|goalkeeper|substitutes?|subs?|defence|defense|midfield|attack)?$/i, '').trim();
@@ -1603,9 +1664,12 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
     teamSearchTerms.forEach(({ term, canonical }) => {
       const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      // Header line pattern: e.g. "- Spurs:", "* Spurs -", "1. Spurs:", "### Spurs", "Spurs:"
+      // Prefix pattern for numbered/lettered team headings e.g. "Team 1: FC Goa", "Team A - Goa", "1. Goa", "Team Goa", "for Goa"
+      const prefixPattern = `(?:[-*•_~#]{1,6}\\s*|\\d+[\\.\\)]\\s*)?(?:(?:team\\s*(?:[0-9]+|[a-zA-Z])|\\d+[\\.\\)])\\s*[:\\-–—]?\\s*|(?:for|in|team|the)\\s+)?`;
+
+      // Header line pattern: e.g. "- Spurs:", "* Spurs -", "1. Spurs:", "### Spurs", "Spurs:", "Team 1: Spurs"
       const headerRegex = new RegExp(
-        `(?:^|\\n)\\s*(?:[-*•_~#]{1,6}\\s*|\\d+[\\.\\)]\\s*)?(?:(?:for|in|team|the)\\s+)?(${escaped})(?:[*_~]{1,6})?\\s*(?:[:\\-–—]|\\n|$)`,
+        `(?:^|\\n)\\s*${prefixPattern}(${escaped})(?:[*_~]{1,6})?\\s*(?:[:\\-–—]|\\n|$)`,
         'gi'
       );
       let hm: RegExpExecArray | null;
@@ -1620,8 +1684,8 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
         addOccurrence(canonical, cm.index, cm[0].length);
       }
 
-      // Inline colon pattern: e.g. "Spurs: Anirudh..."
-      const colonRegex = new RegExp(`(?:^|\\n)\\s*(?:[-*•_~#]{1,6}\\s*)?(${escaped})\\s*[:\\-–—]`, 'gi');
+      // Inline colon pattern: e.g. "Spurs: Anirudh...", "Team 1: Spurs: Anirudh..."
+      const colonRegex = new RegExp(`(?:^|\\n)\\s*${prefixPattern}(${escaped})\\s*[:\\-–—]`, 'gi');
       let clm: RegExpExecArray | null;
       while ((clm = colonRegex.exec(text)) !== null) {
         addOccurrence(canonical, clm.index, clm[0].length);
@@ -1644,20 +1708,35 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
   }
 
   // 2. Generic team boundary detection (finds team headings in text whether knownTeams is empty or has unmatched teams)
-  // Matches e.g. "- Team Alpha: ...", "Crystal Palace: Hari, Arjun...", "Team 1: ..."
+  // Matches e.g. "- Team Alpha: ...", "Crystal Palace: Hari, Arjun...", "Team 1: FC Goa"
   const genericLineRegex = /(?:^|\n)\s*(?:[-*•_~#]{1,6}\s*|\d+[\.\)]\s*)?(?:(?:team|the)\s+)?([A-Za-z0-9\s'&.-]{2,35}?)(?:[*_~]{1,6})?\s*([:\-–—])\s*([^\n]+)/gi;
   let gm: RegExpExecArray | null;
   while ((gm = genericLineRegex.exec(text)) !== null) {
-    const candidate = gm[1].trim();
+    let candidate = gm[1].trim();
     const separator = gm[2];
     const restOfLine = gm[3].trim();
 
     if (isInstructionLine(candidate)) continue;
     if (/^(?:manager|coach|captain|players?|squad|roster|substitutes?|gk|def|mid|fwd|rules?|format)$/i.test(candidate)) continue;
 
+    // If candidate is a numbered prefix like "Team 1", "Team 2", "Team A", or "1", check if the actual team name is in restOfLine
+    if (/^(?:team\s*(?:[0-9]+|[a-zA-Z])|\d+)$/i.test(candidate)) {
+      const restCandidateMatch = restOfLine.match(/^([A-Za-z0-9\s'&.-]{2,35}?)(?:\s*[:\-–—]|\s*$)/);
+      if (restCandidateMatch) {
+        const subCandidate = restCandidateMatch[1].trim();
+        if (
+          !isInstructionLine(subCandidate) &&
+          !/^(?:manager|coach|captain|players?|squad|roster|substitutes?|gk|def|mid|fwd|rules?|format)$/i.test(subCandidate) &&
+          !POSITION_MAP[subCandidate.toLowerCase()]
+        ) {
+          candidate = subCandidate;
+        }
+      }
+    }
+
     const matched = matchKnownTeam(candidate, knownTeams);
     if (matched) {
-      addOccurrence(matched, gm.index, gm[0].length - restOfLine.length);
+      addOccurrence(matched, gm.index, gm[0].length - (candidate === gm[1].trim() ? restOfLine.length : 0));
     } else {
       // Must NOT be a player line where separator precedes a position/role:
       // E.g. "- Adithyan Raj — Goalkeeper, Captain" or "Daniel: GK"
@@ -1668,6 +1747,11 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
       // For an unknown team, separator must be a colon ':' OR the line must start with 'Team '
       const isExplicitTeam = /^(?:team\s+|\d+[\.\)]\s*team\s+)/i.test(gm[0]) || separator === ':';
       if (!isExplicitTeam) {
+        continue;
+      }
+
+      // If candidate is just "Team 1", "Team 2", don't invent generic teams if knownTeams was provided and non-empty
+      if (knownTeams.length > 0 && /^(?:team\s*(?:[0-9]+|[a-zA-Z])|\d+)$/i.test(candidate)) {
         continue;
       }
 
@@ -1686,8 +1770,15 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
   let mhm: RegExpExecArray | null;
   while ((mhm = markdownHeaderRegex.exec(text)) !== null) {
     const candidate = mhm[1].trim();
-    if (!isInstructionLine(candidate) && !/^(?:manager|coach|captain|players?|squad|roster)$/i.test(candidate)) {
+    if (
+      !isInstructionLine(candidate) &&
+      !/^(?:manager|coach|captain|players?|squad|roster)$/i.test(candidate) &&
+      !/\b(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|gk|def|mid|fwd|sub|substitute)\b/i.test(candidate)
+    ) {
       const matched = matchKnownTeam(candidate, knownTeams);
+      if (knownTeams.length > 0 && !matched) {
+        continue;
+      }
       const targetName = matched || normalizeTeamName(candidate);
       addOccurrence(targetName, mhm.index, mhm[0].length);
     }
@@ -1717,8 +1808,14 @@ export function parseSquadPrompt(promptText: string, knownTeams: string[] = []):
   let fm: RegExpExecArray | null;
   while ((fm = forPrefixRegex.exec(text)) !== null) {
     const rawName = fm[1].trim();
-    if (!isInstructionLine(rawName)) {
+    if (
+      !isInstructionLine(rawName) &&
+      !/\b(?:goalkeeper|keeper|goalie|defender|midfielder|forward|striker|gk|def|mid|fwd|sub|substitute)\b/i.test(rawName)
+    ) {
       const matched = matchKnownTeam(rawName, knownTeams);
+      if (knownTeams.length > 0 && !matched) {
+        continue;
+      }
       const targetName = matched || normalizeTeamName(rawName);
       addOccurrence(targetName, fm.index, fm[0].length);
     }
@@ -1847,11 +1944,13 @@ function parsePlayerToken(
   }
 
   let isCaptain = false;
+  let isSubstitute: boolean | undefined = undefined;
   let detectedPosition: Position = 'MID';
   let jerseyNumber: number | undefined;
 
-  // 1. Check if token has separator dash/colon (e.g. "Adithyan Raj — Goalkeeper, Captain" or "Nikhil Das — Defender")
-  const dashMatch = token.match(/^(.+?)\s*[—–\-:]\s*([A-Za-z0-9\s,;#()]+)$/);
+  // 1. Check if token has separator dash/colon or comma preceding role (e.g. "Adithyan Raj — Goalkeeper, Captain" or "Player A, Defender")
+  const dashMatch = token.match(/^(.+?)\s*[—–\-:]\s*([A-Za-z0-9\s,;#()]+)$/) ||
+    token.match(/^([A-Za-z0-9\s'.-]+?)\s*,\s*([A-Za-z0-9\s,;#()]+)$/);
   if (dashMatch) {
     const leftPart = dashMatch[1].trim();
     const rightPart = dashMatch[2].trim();
@@ -1864,6 +1963,12 @@ function parsePlayerToken(
       // Check captain
       if (sub === 'c' || sub === 'captain' || sub.includes('captain')) {
         isCaptain = true;
+        hasRoleOrPos = true;
+      }
+      // Check substitute
+      if (sub === 'sub' || sub === 'substitute' || sub === 'subs') {
+        isSubstitute = true;
+        detectedPosition = 'TBD';
         hasRoleOrPos = true;
       }
       // Check position
@@ -1893,7 +1998,12 @@ function parsePlayerToken(
       const lowerPart = part.toLowerCase();
       if (lowerPart === 'c' || lowerPart === 'captain' || lowerPart.includes('captain')) {
         isCaptain = true;
-      } else if (POSITION_MAP[lowerPart]) {
+      }
+      if (lowerPart === 'sub' || lowerPart === 'substitute' || lowerPart === 'subs') {
+        isSubstitute = true;
+        detectedPosition = 'TBD';
+      }
+      if (POSITION_MAP[lowerPart]) {
         detectedPosition = POSITION_MAP[lowerPart];
       }
       const jMatch = lowerPart.match(/(?:#|no\.?|jersey|number)\s*(\d+)/i);
@@ -1979,6 +2089,7 @@ function parsePlayerToken(
     position: detectedPosition,
     jerseyNumber,
     isCaptain,
+    isSubstitute,
   };
 }
 
@@ -2153,6 +2264,19 @@ function parseTeamBody(body: string, squad: ParsedTeamSquad, warnings: string[],
       // Check if right side only contains roles/positions
       const rightWords = dashMatch[2].toLowerCase().replace(/[,;()]/g, ' ').split(/\s+/).filter(Boolean);
       const isPureRole = rightWords.every(w =>
+        POSITION_MAP[w] || ['c', 'captain', 'sub', 'substitute', 'subs', 'no', 'jersey', 'number'].includes(w) || /^\d+$/.test(w)
+      );
+      if (isPureRole) {
+        candidateTokens.push(line);
+        return;
+      }
+    }
+
+    // Check if line looks like e.g. "- Player A, Goalkeeper" or "Player A, Defender, Captain"
+    const commaRoleMatch = line.match(/^[-*•\d+.)\s]*([^,]+?)\s*,\s*(.+)$/);
+    if (!dashMatch && commaRoleMatch) {
+      const rightWords = commaRoleMatch[2].toLowerCase().replace(/[,;()]/g, ' ').split(/\s+/).filter(Boolean);
+      const isPureRole = rightWords.length > 0 && rightWords.every(w =>
         POSITION_MAP[w] || ['c', 'captain', 'sub', 'substitute', 'subs', 'no', 'jersey', 'number'].includes(w) || /^\d+$/.test(w)
       );
       if (isPureRole) {

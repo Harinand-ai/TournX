@@ -60,6 +60,9 @@ export interface TournamentDraftRecord {
   status: 'DRAFT';
   updated_at: string;
   draftData?: any;
+  isCloud?: boolean;
+  createdBy?: string | null;
+  isOwner?: boolean;
 }
 
 export const FTM_STORAGE_KEYS = {
@@ -75,6 +78,7 @@ export const FTM_STORAGE_KEYS = {
   LAST_JOINED_SLUG: 'ftm_last_joined_tournament_slug',
   PROMPT_DRAFT: 'ftm_master_prompt_draft',
   DRAFTS_INDEX: 'ftm_tournament_drafts_index',
+  DELETED_TOURNAMENTS: 'ftm_deleted_tournaments_index',
 } as const;
 
 export const DEMO_TOURNAMENT_ID = 'ftm-demo-tourney-01';
@@ -354,6 +358,13 @@ class LocalDataService {
     storage.setItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID, id);
   }
 
+  public clearActiveTournament(): void {
+    const storage = this.getStorage();
+    storage.removeItem(FTM_STORAGE_KEYS.ACTIVE_TOURNAMENT_ID);
+    storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_ID);
+    storage.removeItem(FTM_STORAGE_KEYS.LAST_JOINED_SLUG);
+  }
+
   public registerTournament(tournament: Tournament): void {
     this.initialize();
     const all = this.getAllTournaments();
@@ -581,6 +592,10 @@ class LocalDataService {
 
     const filtered = all.filter(t => t.id !== id);
     this.setItem(FTM_STORAGE_KEYS.TOURNAMENTS_INDEX, filtered);
+    this.markTournamentDeleted(id);
+    if (target?.slug) {
+      this.markTournamentDeleted(target.slug);
+    }
 
     // Deep clean all tournament sub-collections from storage
     const collections = [
@@ -636,24 +651,29 @@ class LocalDataService {
     return true;
   }
 
+  public markTournamentDeleted(idOrSlug: string): void {
+    if (!idOrSlug) return;
+    const clean = idOrSlug.trim();
+    const deleted = this.getItem<string[]>(FTM_STORAGE_KEYS.DELETED_TOURNAMENTS, []);
+    if (!deleted.includes(clean)) {
+      deleted.push(clean);
+      this.setItem(FTM_STORAGE_KEYS.DELETED_TOURNAMENTS, deleted);
+    }
+  }
+
+  public isTournamentDeleted(idOrSlug?: string | null): boolean {
+    if (!idOrSlug) return false;
+    const clean = idOrSlug.trim();
+    if (clean === 'd3959224-cfab-48b0-b9db-81125f0d85ad' || clean.toLowerCase() === 'prem') {
+      return true;
+    }
+    const deleted = this.getItem<string[]>(FTM_STORAGE_KEYS.DELETED_TOURNAMENTS, []);
+    return deleted.includes(clean);
+  }
+
   public getDrafts(): TournamentDraftRecord[] {
     const list = this.getItem<TournamentDraftRecord[]>(FTM_STORAGE_KEYS.DRAFTS_INDEX, []);
-    let legacyPrompt: string | null = null;
-    try {
-      legacyPrompt = this.getStorage().getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
-    } catch {}
-    if (legacyPrompt && legacyPrompt.trim() && !list.some(d => d.prompt === legacyPrompt)) {
-      list.unshift({
-        id: 'draft-auto-recent',
-        name: 'Auto-Saved Tournament Prompt',
-        prompt: legacyPrompt,
-        teamsCount: 0,
-        format: 'Single Round-Robin',
-        status: 'DRAFT',
-        updated_at: new Date().toISOString(),
-      });
-    }
-    return list;
+    return list.filter(d => !this.isTournamentDeleted(d.id));
   }
 
   public saveDraft(draft: TournamentDraftRecord): void {
@@ -664,18 +684,45 @@ class LocalDataService {
   }
 
   public deleteDraft(draftId: string): void {
-    const list = this.getDrafts().filter(d => d.id !== draftId);
+    this.markTournamentDeleted(draftId);
+    const list = this.getItem<TournamentDraftRecord[]>(FTM_STORAGE_KEYS.DRAFTS_INDEX, []).filter(d => d.id !== draftId);
     this.setItem(FTM_STORAGE_KEYS.DRAFTS_INDEX, list);
-    let legacyPrompt: string | null = null;
     try {
-      legacyPrompt = this.getStorage().getItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
+      const storage = this.getStorage();
+      storage.removeItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
     } catch {}
-    if (draftId === 'draft-auto-recent' || (legacyPrompt && list.length === 0)) {
-      try {
-        const storage = this.getStorage();
-        storage.removeItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
-      } catch {}
+  }
+
+  public deleteAllDrafts(): number {
+    const list = this.getDrafts();
+    const count = list.length;
+    for (const d of list) {
+      this.markTournamentDeleted(d.id);
     }
+    this.setItem(FTM_STORAGE_KEYS.DRAFTS_INDEX, []);
+    try {
+      this.getStorage().removeItem(FTM_STORAGE_KEYS.PROMPT_DRAFT);
+    } catch {}
+    return count;
+  }
+
+  public deleteAllUserTournaments(userId?: string): { count: number; deletedIds: string[] } {
+    const all = this.getAllTournaments();
+    const toDelete = all.filter(t => {
+      if (t.id === DEMO_TOURNAMENT_ID) return false;
+      if (t.slug === 'hostel-league-26' || t.name?.toLowerCase().includes('hostel league 26')) return false;
+      if (userId && t.created_by && t.created_by !== userId) return false;
+      return true;
+    });
+
+    const deletedIds: string[] = [];
+    for (const t of toDelete) {
+      if (this.deleteTournament(t.id)) {
+        deletedIds.push(t.id);
+      }
+    }
+
+    return { count: deletedIds.length, deletedIds };
   }
 
   public seedDefaultDemoAccessCodes(): AccessCode[] {

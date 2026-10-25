@@ -29,7 +29,7 @@ export interface ProposedMediaMatch {
 /**
  * Normalizes text for comparing names and filenames.
  * e.g., "ADWAITH K(1).jpg" -> "adwaith k"
- * e.g., "Kerala Blasters FC.png" -> "kerala blasters fc"
+ * e.g., "FC Goa.png" -> "fc goa"
  */
 export function normalizeMediaName(input: string): string {
   return input

@@ -26,7 +26,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c120e]/95 border-t border-[#1f2e26] backdrop-blur-md px-2 py-1 safe-bottom shadow-2xl">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#101013]/95 border-t border-white/[0.08] backdrop-blur-md px-2 py-1 safe-bottom shadow-2xl">
       <div className="flex items-center justify-around max-w-md mx-auto">
         {tabs.map(tab => {
           const Icon = tab.icon;
@@ -37,7 +37,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <button
                 key={tab.id}
                 onClick={onOpenLiveWindow}
-                className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 text-rose-400 active:scale-95 transition-transform cursor-pointer"
+                className="flex-1 flex flex-col items-center justify-center py-1.5 px-1 text-[#F02D50] active:scale-95 transition-transform cursor-pointer"
                 title="Open Live Match Window"
               >
                 <Icon className="w-4 h-4 animate-pulse" />
@@ -54,8 +54,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               onClick={() => onNavigate(tab.id)}
               className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 transition-colors cursor-pointer ${
                 isActive
-                  ? 'text-lime-400 font-bold'
-                  : 'text-slate-400 hover:text-white font-medium'
+                  ? 'text-[#F02D50] font-bold'
+                  : 'text-[#A5A1A4] hover:text-[#F0E9E7] font-medium'
               }`}
             >
               <Icon className="w-4 h-4" />

@@ -101,102 +101,80 @@ export function MatchScoreEditorModal({
     }
   }, [match, currentGoals, currentMotm, homeTeam, awayTeam]);
 
-  // Player rosters
+  // Player lists for home and away
+  const hTeamId = homeTeam?.id || match?.home_team_id;
+  const aTeamId = awayTeam?.id || match?.away_team_id;
+
   const homePlayers = useMemo(() => {
-    if (!match) return [];
-    const tId = homeTeam?.id || match.home_team_id;
-    return players.filter(p => p.team_id === tId);
-  }, [players, homeTeam, match]);
+    return players.filter(p => p.team_id === hTeamId);
+  }, [players, hTeamId]);
 
   const awayPlayers = useMemo(() => {
-    if (!match) return [];
-    const tId = awayTeam?.id || match.away_team_id;
-    return players.filter(p => p.team_id === tId);
-  }, [players, awayTeam, match]);
+    return players.filter(p => p.team_id === aTeamId);
+  }, [players, aTeamId]);
 
   const playersMap = useMemo(() => {
     return new Map(players.map(p => [p.id, p]));
   }, [players]);
 
-  // Goal adding helpers
+  // Goal adding handlers
   const handleAddHomeGoal = () => {
-    if (!selectedHomePlayerToAdd || !match) return;
-    const tId = homeTeam?.id || match.home_team_id;
-    setHomeGoals(prev => [...prev, { player_id: selectedHomePlayerToAdd, team_id: tId }]);
-    
-    // Auto-update score if score is currently lower or empty
-    const currentVal = homeScore === '' ? 0 : Number(homeScore);
-    if (homeGoals.length + 1 > currentVal) {
-      setHomeScore(homeGoals.length + 1);
-    }
+    if (!selectedHomePlayerToAdd || !hTeamId) return;
+    setHomeGoals(prev => [...prev, { player_id: selectedHomePlayerToAdd, team_id: hTeamId }]);
     setSelectedHomePlayerToAdd('');
-  };
 
-  const handleAddAwayGoal = () => {
-    if (!selectedAwayPlayerToAdd || !match) return;
-    const tId = awayTeam?.id || match.away_team_id;
-    setAwayGoals(prev => [...prev, { player_id: selectedAwayPlayerToAdd, team_id: tId }]);
-
-    // Auto-update score if score is currently lower or empty
-    const currentVal = awayScore === '' ? 0 : Number(awayScore);
-    if (awayGoals.length + 1 > currentVal) {
-      setAwayScore(awayGoals.length + 1);
-    }
-    setSelectedAwayPlayerToAdd('');
+    // If homeScore is less than new goals count, auto-update score
+    setHomeScore(prev => {
+      const current = prev === '' ? 0 : Number(prev);
+      return Math.max(current, homeGoals.length + 1);
+    });
   };
 
   const handleRemoveHomeGoal = (index: number) => {
     setHomeGoals(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleAddAwayGoal = () => {
+    if (!selectedAwayPlayerToAdd || !aTeamId) return;
+    setAwayGoals(prev => [...prev, { player_id: selectedAwayPlayerToAdd, team_id: aTeamId }]);
+    setSelectedAwayPlayerToAdd('');
+
+    // If awayScore is less than new goals count, auto-update score
+    setAwayScore(prev => {
+      const current = prev === '' ? 0 : Number(prev);
+      return Math.max(current, awayGoals.length + 1);
+    });
+  };
+
   const handleRemoveAwayGoal = (index: number) => {
     setAwayGoals(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Discrepancy checks
-  const numHomeScore = homeScore === '' ? null : Number(homeScore);
-  const numAwayScore = awayScore === '' ? null : Number(awayScore);
+  // Validation: Check if goals count exceeds entered score
+  const numHomeScore = homeScore === '' ? 0 : Number(homeScore);
+  const numAwayScore = awayScore === '' ? 0 : Number(awayScore);
 
-  const homeGoalsExceedScore = numHomeScore !== null && homeGoals.length > numHomeScore;
-  const awayGoalsExceedScore = numAwayScore !== null && awayGoals.length > numAwayScore;
+  const homeGoalsExceedScore = homeGoals.length > numHomeScore;
+  const awayGoalsExceedScore = awayGoals.length > numAwayScore;
   const hasDiscrepancy = homeGoalsExceedScore || awayGoalsExceedScore;
 
+  // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!match) return;
-    setErrorNotice(null);
 
     if (hasDiscrepancy) {
-      setErrorNotice(
-        'Cannot save: Score cannot be less than the number of recorded goal events. Please update the score or remove extra goal events.'
-      );
+      setErrorNotice('Recorded player goals cannot exceed team final score. Please adjust scores or remove surplus goals.');
       return;
     }
 
-    // When a match is marked COMPLETED, verify that recorded goal events exactly match the score
-    if (status === 'COMPLETED') {
-      const finalH = numHomeScore ?? 0;
-      const finalA = numAwayScore ?? 0;
-      if (homeGoals.length !== finalH) {
-        setErrorNotice(
-          `Home score is ${finalH}, but ${homeGoals.length} goalscorer${homeGoals.length === 1 ? '' : 's'} recorded. Please add all ${finalH} scorer${finalH === 1 ? '' : 's'} or adjust the score.`
-        );
-        return;
-      }
-      if (awayGoals.length !== finalA) {
-        setErrorNotice(
-          `Away score is ${finalA}, but ${awayGoals.length} goalscorer${awayGoals.length === 1 ? '' : 's'} recorded. Please add all ${finalA} scorer${finalA === 1 ? '' : 's'} or adjust the score.`
-        );
-        return;
-      }
-    }
+    // Default status to COMPLETED if scores were entered and status is UPCOMING
+    let finalStatus = status;
+    const finalHomeScore = homeScore === '' ? null : Number(homeScore);
+    const finalAwayScore = awayScore === '' ? null : Number(awayScore);
 
-    let finalHomeScore = numHomeScore;
-    let finalAwayScore = numAwayScore;
-
-    if (status === 'COMPLETED') {
-      if (finalHomeScore === null) finalHomeScore = homeGoals.length;
-      if (finalAwayScore === null) finalAwayScore = awayGoals.length;
+    if (finalHomeScore !== null && finalAwayScore !== null && status === 'UPCOMING') {
+      finalStatus = 'COMPLETED';
     }
 
     setIsSaving(true);
@@ -204,7 +182,7 @@ export function MatchScoreEditorModal({
       const combinedGoals = [...homeGoals, ...awayGoals];
       await onSave({
         matchId: match.id,
-        status,
+        status: finalStatus,
         homeScore: finalHomeScore,
         awayScore: finalAwayScore,
         scheduledDate: scheduledDate ? scheduledDate.trim() : null,
@@ -223,25 +201,27 @@ export function MatchScoreEditorModal({
   if (!isOpen || !match) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] text-slate-900 overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-[#19191F] border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] text-[#F0E9E7] overflow-hidden my-auto">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-emerald-600" />
+        <div className="flex items-center justify-between px-5 py-3.5 bg-[#141418] border-b border-white/[0.08] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50]">
+              <Trophy className="w-4 h-4" />
+            </div>
             <div>
-              <h2 className="text-sm font-bold uppercase text-slate-900 tracking-wide">
+              <h2 className="text-sm font-bold uppercase font-display text-[#F0E9E7] tracking-wide">
                 Match #{match.match_number} — Score & Events
               </h2>
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-[#A5A1A4] font-mono">
                 Round {match.round_number || 1} • {homeTeam?.name || 'Home'} vs {awayTeam?.name || 'Away'}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-[#202028] transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -252,15 +232,15 @@ export function MatchScoreEditorModal({
           
           {/* Error / Warning Notice */}
           {errorNotice && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-800">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 flex items-start gap-2.5 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <span>{errorNotice}</span>
             </div>
           )}
 
           {/* 1. Scoreboard Input Section */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="p-4 rounded-xl bg-[#141418] border border-white/10 space-y-3">
+            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#A5A1A4]">
               Match Score & Status
             </div>
 
@@ -269,7 +249,7 @@ export function MatchScoreEditorModal({
               <div className="col-span-2 space-y-1.5">
                 <div className="flex items-center justify-center gap-2">
                   {homeTeam && <TeamBadge team={homeTeam} size="xs" />}
-                  <span className="font-bold text-xs text-slate-800 truncate max-w-[120px]">
+                  <span className="font-bold text-xs text-[#F0E9E7] truncate max-w-[120px] font-display">
                     {homeTeam?.name || 'Home Team'}
                   </span>
                 </div>
@@ -277,7 +257,7 @@ export function MatchScoreEditorModal({
                   <button
                     type="button"
                     onClick={() => setHomeScore(prev => Math.max(0, (prev === '' ? 0 : prev) - 1))}
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-sm cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-[#19191F] border border-white/10 hover:bg-[#202028] text-[#F0E9E7] font-bold text-sm cursor-pointer"
                   >
                     -
                   </button>
@@ -287,28 +267,28 @@ export function MatchScoreEditorModal({
                     value={homeScore}
                     onChange={e => setHomeScore(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
                     placeholder="0"
-                    className="w-14 h-10 text-center font-bold text-xl rounded-lg bg-white border border-slate-300 text-slate-900 focus:border-emerald-600 focus:outline-none"
+                    className="w-14 h-10 text-center font-score font-black text-xl rounded-lg bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setHomeScore(prev => (prev === '' ? 0 : prev) + 1)}
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-sm cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-[#19191F] border border-white/10 hover:bg-[#202028] text-[#F0E9E7] font-bold text-sm cursor-pointer"
                   >
                     +
                   </button>
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium">
+                <div className="text-[10px] text-[#A5A1A4] font-mono">
                   {homeGoals.length} goal{homeGoals.length === 1 ? '' : 's'} recorded
                 </div>
               </div>
 
               {/* VS Divider */}
               <div className="col-span-1 flex flex-col items-center justify-center">
-                <span className="text-xs font-black text-slate-400">VS</span>
-                <span className={`mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                  status === 'COMPLETED' ? 'bg-slate-200 text-slate-700' :
-                  status === 'LIVE' ? 'bg-emerald-100 text-emerald-800 animate-pulse' :
-                  'bg-blue-50 text-blue-700'
+                <span className="text-xs font-mono font-black text-[#A5A1A4]">VS</span>
+                <span className={`mt-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                  status === 'COMPLETED' ? 'bg-[#101013] text-[#A5A1A4] border border-white/10' :
+                  status === 'LIVE' ? 'bg-[#21191D] text-[#F02D50] border border-[#F02D50]/40 animate-pulse' :
+                  'bg-[#19191F] text-[#F0E9E7] border border-white/10'
                 }`}>
                   {status}
                 </span>
@@ -317,7 +297,7 @@ export function MatchScoreEditorModal({
               {/* Away Team */}
               <div className="col-span-2 space-y-1.5">
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-bold text-xs text-slate-800 truncate max-w-[120px]">
+                  <span className="font-bold text-xs text-[#F0E9E7] truncate max-w-[120px] font-display">
                     {awayTeam?.name || 'Away Team'}
                   </span>
                   {awayTeam && <TeamBadge team={awayTeam} size="xs" />}
@@ -326,7 +306,7 @@ export function MatchScoreEditorModal({
                   <button
                     type="button"
                     onClick={() => setAwayScore(prev => Math.max(0, (prev === '' ? 0 : prev) - 1))}
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-sm cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-[#19191F] border border-white/10 hover:bg-[#202028] text-[#F0E9E7] font-bold text-sm cursor-pointer"
                   >
                     -
                   </button>
@@ -336,17 +316,17 @@ export function MatchScoreEditorModal({
                     value={awayScore}
                     onChange={e => setAwayScore(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
                     placeholder="0"
-                    className="w-14 h-10 text-center font-bold text-xl rounded-lg bg-white border border-slate-300 text-slate-900 focus:border-emerald-600 focus:outline-none"
+                    className="w-14 h-10 text-center font-score font-black text-xl rounded-lg bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setAwayScore(prev => (prev === '' ? 0 : prev) + 1)}
-                    className="w-8 h-8 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-sm cursor-pointer"
+                    className="w-8 h-8 rounded-lg bg-[#19191F] border border-white/10 hover:bg-[#202028] text-[#F0E9E7] font-bold text-sm cursor-pointer"
                   >
                     +
                   </button>
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium">
+                <div className="text-[10px] text-[#A5A1A4] font-mono">
                   {awayGoals.length} goal{awayGoals.length === 1 ? '' : 's'} recorded
                 </div>
               </div>
@@ -354,34 +334,34 @@ export function MatchScoreEditorModal({
 
             {/* Discrepancy warnings */}
             {homeGoalsExceedScore && (
-              <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-300 text-[11px] flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>
-                  Discrepancy: {homeTeam?.name || 'Home Team'} score ({numHomeScore}) is lower than the {homeGoals.length} recorded goal events. Please increase the score or remove extra goals.
+                  Discrepancy: {homeTeam?.name || 'Home'} score ({numHomeScore}) is lower than recorded goals ({homeGoals.length}).
                 </span>
               </div>
             )}
             {awayGoalsExceedScore && (
-              <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <div className="p-2.5 rounded-lg bg-amber-950/40 border border-amber-800/60 text-amber-300 text-[11px] flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>
-                  Discrepancy: {awayTeam?.name || 'Away Team'} score ({numAwayScore}) is lower than the {awayGoals.length} recorded goal events. Please increase the score or remove extra goals.
+                  Discrepancy: {awayTeam?.name || 'Away'} score ({numAwayScore}) is lower than recorded goals ({awayGoals.length}).
                 </span>
               </div>
             )}
           </div>
 
           {/* 2. Status & Scheduling Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <label className="font-mono text-[#A5A1A4] flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-[#F02D50]" />
                 <span>Status</span>
               </label>
               <select
                 value={status}
                 onChange={e => setStatus(e.target.value as any)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none font-mono"
               >
                 <option value="UPCOMING">Upcoming</option>
                 <option value="LIVE">Live (In Progress)</option>
@@ -390,21 +370,21 @@ export function MatchScoreEditorModal({
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <label className="font-mono text-[#A5A1A4] flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-[#F02D50]" />
                 <span>Date (Optional)</span>
               </label>
               <input
                 type="date"
                 value={scheduledDate}
                 onChange={e => setScheduledDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none font-mono"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <label className="font-mono text-[#A5A1A4] flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[#F02D50]" />
                 <span>Venue (Optional)</span>
               </label>
               <input
@@ -412,19 +392,19 @@ export function MatchScoreEditorModal({
                 value={venue}
                 onChange={e => setVenue(e.target.value)}
                 placeholder="e.g. Ground A, Stadium Pitch"
-                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none placeholder:text-slate-400"
+                className="w-full px-3 py-2 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none placeholder:text-[#6E6A6D]"
               />
             </div>
           </div>
 
           {/* 3. Goalscorers Section */}
-          <div className="space-y-3 pt-2 border-t border-slate-200">
+          <div className="space-y-3 pt-2 border-t border-white/[0.08]">
             <div className="flex items-center justify-between">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-emerald-600" />
+              <div className="text-xs font-mono font-bold uppercase tracking-wider text-[#F0E9E7] flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-[#F02D50]" />
                 <span>Goalscorers Tracking</span>
               </div>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-[#A5A1A4] font-mono">
                 Associates goals to players for stats & golden boot
               </span>
             </div>
@@ -432,10 +412,10 @@ export function MatchScoreEditorModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               
               {/* Home Team Goalscorers */}
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-200 pb-1.5">
+              <div className="p-3.5 rounded-xl border border-white/10 bg-[#141418] space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-[#F0E9E7] border-b border-white/[0.08] pb-1.5">
                   <span className="truncate">{homeTeam?.name || 'Home'} Goals</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] text-[10px] font-mono font-bold">
                     {homeGoals.length}
                   </span>
                 </div>
@@ -445,7 +425,7 @@ export function MatchScoreEditorModal({
                   <select
                     value={selectedHomePlayerToAdd}
                     onChange={e => setSelectedHomePlayerToAdd(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none truncate"
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none truncate"
                   >
                     <option value="">Select scorer...</option>
                     {homePlayers.map(p => (
@@ -458,7 +438,7 @@ export function MatchScoreEditorModal({
                     type="button"
                     onClick={handleAddHomeGoal}
                     disabled={!selectedHomePlayerToAdd}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-40 cursor-pointer flex items-center gap-1 shrink-0"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#F02D50] text-white text-xs font-bold hover:bg-[#FF3358] transition disabled:opacity-40 cursor-pointer flex items-center gap-1 shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add</span>
@@ -468,7 +448,7 @@ export function MatchScoreEditorModal({
                 {/* List of Home Goals */}
                 <div className="space-y-1 max-h-36 overflow-y-auto">
                   {homeGoals.length === 0 ? (
-                    <div className="text-[11px] text-slate-400 italic py-1 text-center">
+                    <div className="text-[11px] text-[#A5A1A4] italic py-1 text-center font-mono">
                       No goals recorded yet.
                     </div>
                   ) : (
@@ -477,17 +457,17 @@ export function MatchScoreEditorModal({
                       return (
                         <div
                           key={`hg-${idx}-${g.player_id}`}
-                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 shadow-2xs"
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#101013] border border-white/10 text-xs text-[#F0E9E7]"
                         >
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className="w-4 text-center font-mono text-[10px] text-slate-400">
+                            <span className="w-4 text-center font-mono text-[10px] text-[#F02D50]">
                               #{idx + 1}
                             </span>
                             <span className="font-semibold truncate">
                               {player?.name || 'Unknown Player'}
                             </span>
                             {player?.position && (
-                              <span className="text-[10px] text-slate-400">
+                              <span className="text-[10px] text-[#A5A1A4] font-mono">
                                 ({player.position})
                               </span>
                             )}
@@ -495,7 +475,7 @@ export function MatchScoreEditorModal({
                           <button
                             type="button"
                             onClick={() => handleRemoveHomeGoal(idx)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                            className="p-1 text-[#A5A1A4] hover:text-rose-400 transition cursor-pointer"
                             title="Remove goal"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -508,10 +488,10 @@ export function MatchScoreEditorModal({
               </div>
 
               {/* Away Team Goalscorers */}
-              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800 border-b border-slate-200 pb-1.5">
+              <div className="p-3.5 rounded-xl border border-white/10 bg-[#141418] space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-[#F0E9E7] border-b border-white/[0.08] pb-1.5">
                   <span className="truncate">{awayTeam?.name || 'Away'} Goals</span>
-                  <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">
+                  <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] text-[10px] font-mono font-bold">
                     {awayGoals.length}
                   </span>
                 </div>
@@ -521,7 +501,7 @@ export function MatchScoreEditorModal({
                   <select
                     value={selectedAwayPlayerToAdd}
                     onChange={e => setSelectedAwayPlayerToAdd(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none truncate"
+                    className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none truncate"
                   >
                     <option value="">Select scorer...</option>
                     {awayPlayers.map(p => (
@@ -534,7 +514,7 @@ export function MatchScoreEditorModal({
                     type="button"
                     onClick={handleAddAwayGoal}
                     disabled={!selectedAwayPlayerToAdd}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-40 cursor-pointer flex items-center gap-1 shrink-0"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#F02D50] text-white text-xs font-bold hover:bg-[#FF3358] transition disabled:opacity-40 cursor-pointer flex items-center gap-1 shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add</span>
@@ -544,7 +524,7 @@ export function MatchScoreEditorModal({
                 {/* List of Away Goals */}
                 <div className="space-y-1 max-h-36 overflow-y-auto">
                   {awayGoals.length === 0 ? (
-                    <div className="text-[11px] text-slate-400 italic py-1 text-center">
+                    <div className="text-[11px] text-[#A5A1A4] italic py-1 text-center font-mono">
                       No goals recorded yet.
                     </div>
                   ) : (
@@ -553,17 +533,17 @@ export function MatchScoreEditorModal({
                       return (
                         <div
                           key={`ag-${idx}-${g.player_id}`}
-                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 shadow-2xs"
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#101013] border border-white/10 text-xs text-[#F0E9E7]"
                         >
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className="w-4 text-center font-mono text-[10px] text-slate-400">
+                            <span className="w-4 text-center font-mono text-[10px] text-[#F02D50]">
                               #{idx + 1}
                             </span>
                             <span className="font-semibold truncate">
                               {player?.name || 'Unknown Player'}
                             </span>
                             {player?.position && (
-                              <span className="text-[10px] text-slate-400">
+                              <span className="text-[10px] text-[#A5A1A4] font-mono">
                                 ({player.position})
                               </span>
                             )}
@@ -571,7 +551,7 @@ export function MatchScoreEditorModal({
                           <button
                             type="button"
                             onClick={() => handleRemoveAwayGoal(idx)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                            className="p-1 text-[#A5A1A4] hover:text-rose-400 transition cursor-pointer"
                             title="Remove goal"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -587,13 +567,13 @@ export function MatchScoreEditorModal({
           </div>
 
           {/* 4. Player of the Match (POTM) */}
-          <div className="space-y-2 pt-2 border-t border-slate-200">
+          <div className="space-y-2 pt-2 border-t border-white/[0.08]">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-amber-500" />
+              <label className="text-xs font-mono font-bold uppercase tracking-wider text-[#F0E9E7] flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-amber-400" />
                 <span>Player of the Match (POTM)</span>
               </label>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-[#A5A1A4] font-mono">
                 Eligible from participating squads
               </span>
             </div>
@@ -601,7 +581,7 @@ export function MatchScoreEditorModal({
             <select
               value={selectedMotmId}
               onChange={e => setSelectedMotmId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-slate-300 text-slate-800 focus:border-emerald-600 focus:outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] focus:border-[#F02D50] focus:outline-none"
             >
               <option value="">-- No Player Selected --</option>
               
@@ -623,32 +603,32 @@ export function MatchScoreEditorModal({
             </select>
 
             {selectedMotmId && (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900">
-                <Award className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="font-semibold">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#21191D] border border-amber-500/30 text-xs text-amber-300">
+                <Award className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="font-semibold text-[#F0E9E7]">
                   {playersMap.get(selectedMotmId)?.name}
                 </span>
-                <span className="text-amber-700 text-[11px]">
-                  awarded Player of the Match for Match #{match.match_number}
+                <span className="text-[#A5A1A4] text-[11px]">
+                  awarded POTM for Match #{match.match_number}
                 </span>
               </div>
             )}
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200 shrink-0">
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-white/[0.08] shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-xl border border-white/10 text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-[#141418] text-xs font-semibold transition cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving || hasDiscrepancy}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
             >
               {isSaving ? (
                 <>

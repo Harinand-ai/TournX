@@ -228,7 +228,7 @@ export function BulkMediaUploadModal({
                 Select Team Logos & Player Photos
               </h4>
               <p className="text-xs text-slate-500 max-w-sm mb-4">
-                Upload multiple PNG, JPEG, or WebP files at once. TournX matches names automatically (e.g. <span className="font-mono text-slate-700">Adwaith K.jpg</span> or <span className="font-mono text-slate-700">Kerala Blasters.png</span>).
+                Upload multiple PNG, JPEG, or WebP files at once. TournX matches names automatically (e.g. <span className="font-mono text-slate-700">Adwaith K.jpg</span> or <span className="font-mono text-slate-700">FC Goa.png</span>).
               </p>
               <button
                 type="button"

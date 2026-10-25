@@ -92,20 +92,20 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-[#fbfaf6] text-[#0f1712] border border-[#e5e3d8] rounded-2xl shadow-2xl overflow-hidden flex flex-col font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="relative w-full max-w-lg bg-[#19191F] text-[#F0E9E7] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col font-sans">
         
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e5e3d8] bg-[#f5f3ea]/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.08] bg-[#141418]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-[#15803d]/10 text-[#15803d] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#21191D] text-[#F02D50] border border-[#F02D50]/40 flex items-center justify-center">
               <Share2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold tracking-tight text-[#0f1712]">
+              <h2 className="text-base font-bold font-display tracking-tight text-[#F0E9E7]">
                 Share Tournament
               </h2>
-              <p className="text-[11px] text-[#637367]">
+              <p className="text-[11px] text-[#A5A1A4] font-mono">
                 {tournament.name} • {tournament.visibility}
               </p>
             </div>
@@ -114,7 +114,7 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#637367] hover:text-[#0f1712] hover:bg-[#eae8dc] transition cursor-pointer"
+            className="p-1.5 rounded-lg text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-[#202028] transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -125,21 +125,21 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
           
           {/* Shareable Link Box */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[#0f1712] flex items-center justify-between">
+            <label className="text-xs font-semibold text-[#F0E9E7] flex items-center justify-between">
               <span>Direct Public Link</span>
-              <span className="text-[10px] text-[#15803d] font-normal">No account required to view</span>
+              <span className="text-[10px] text-[#F02D50] font-mono">No account required to view</span>
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={shareableUrl}
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-white border border-[#e5e3d8] text-xs font-mono text-[#0f1712] focus:outline-none select-all"
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-xs font-mono text-[#F0E9E7] focus:outline-none select-all"
               />
               <button
                 type="button"
                 onClick={handleCopyLink}
-                className="px-3.5 py-2.5 rounded-xl bg-[#15803d] hover:bg-[#166534] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-xs shrink-0"
+                className="px-3.5 py-2.5 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm shrink-0"
               >
                 {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedLink ? 'Copied' : 'Copy'}</span>
@@ -151,58 +151,58 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             
             {/* Spectator / Viewer Code */}
-            <div className="p-4 rounded-xl bg-white border border-[#e5e3d8] space-y-2">
+            <div className="p-4 rounded-xl bg-[#141418] border border-white/10 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#637367] uppercase tracking-wider flex items-center gap-1">
-                  <Users className="w-3 h-3 text-[#15803d]" /> Spectator Pass
+                <span className="text-[11px] font-mono font-bold text-[#A5A1A4] uppercase tracking-wider flex items-center gap-1">
+                  <Users className="w-3 h-3 text-[#F02D50]" /> Spectator Pass
                 </span>
-                <span className="text-[10px] bg-[#15803d]/10 text-[#15803d] px-2 py-0.5 rounded-full font-medium">
+                <span className="text-[10px] font-mono bg-[#21191D] text-[#F02D50] border border-[#F02D50]/40 px-2 py-0.5 rounded-full font-medium">
                   Read Only
                 </span>
               </div>
-              <div className="text-base font-mono font-bold tracking-wider text-[#0f1712]">
+              <div className="text-base font-mono font-bold tracking-wider text-[#F0E9E7]">
                 {rawViewCode}
               </div>
               <button
                 type="button"
                 onClick={handleCopyViewCode}
-                className="w-full py-1.5 px-3 rounded-lg bg-[#f5f3ea] hover:bg-[#eae8dc] text-xs font-medium text-[#0f1712] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="w-full py-1.5 px-3 rounded-lg bg-[#19191F] hover:bg-[#202028] text-xs font-mono font-medium text-[#F0E9E7] border border-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                {copiedViewCode ? <Check className="w-3 h-3 text-[#15803d]" /> : <Copy className="w-3 h-3 text-[#637367]" />}
-                <span>{copiedViewCode ? 'Code Copied' : 'Copy Spectator Code'}</span>
+                {copiedViewCode ? <Check className="w-3 h-3 text-[#F02D50]" /> : <Copy className="w-3 h-3 text-[#A5A1A4]" />}
+                <span>{copiedViewCode ? 'Copied' : 'Copy Spectator Code'}</span>
               </button>
             </div>
 
             {/* Scorekeeper / Modifier Code */}
-            <div className="p-4 rounded-xl bg-white border border-[#e5e3d8] space-y-2">
+            <div className="p-4 rounded-xl bg-[#141418] border border-white/10 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#637367] uppercase tracking-wider flex items-center gap-1">
-                  <Sliders className="w-3 h-3 text-[#b45309]" /> Scorekeeper Pass
+                <span className="text-[11px] font-mono font-bold text-[#A5A1A4] uppercase tracking-wider flex items-center gap-1">
+                  <Sliders className="w-3 h-3 text-amber-400" /> Scorekeeper Pass
                 </span>
-                <span className="text-[10px] bg-[#b45309]/10 text-[#b45309] px-2 py-0.5 rounded-full font-medium">
+                <span className="text-[10px] font-mono bg-amber-950/60 text-amber-300 border border-amber-800/40 px-2 py-0.5 rounded-full font-medium">
                   Match Scoring
                 </span>
               </div>
-              <div className="text-base font-mono font-bold tracking-wider text-[#0f1712]">
+              <div className="text-base font-mono font-bold tracking-wider text-[#F0E9E7]">
                 {rawScoreCode}
               </div>
               <button
                 type="button"
                 onClick={handleCopyScoreCode}
-                className="w-full py-1.5 px-3 rounded-lg bg-[#f5f3ea] hover:bg-[#eae8dc] text-xs font-medium text-[#0f1712] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                className="w-full py-1.5 px-3 rounded-lg bg-[#19191F] hover:bg-[#202028] text-xs font-mono font-medium text-[#F0E9E7] border border-white/10 flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                {copiedScoreCode ? <Check className="w-3 h-3 text-[#15803d]" /> : <Copy className="w-3 h-3 text-[#637367]" />}
-                <span>{copiedScoreCode ? 'Code Copied' : 'Copy Scorekeeper Code'}</span>
+                {copiedScoreCode ? <Check className="w-3 h-3 text-[#F02D50]" /> : <Copy className="w-3 h-3 text-[#A5A1A4]" />}
+                <span>{copiedScoreCode ? 'Copied' : 'Copy Scorekeeper Code'}</span>
               </button>
             </div>
 
           </div>
 
           {/* Participant Instructions Note */}
-          <div className="p-3.5 rounded-xl bg-[#f5f3ea] border border-[#e5e3d8] flex items-start gap-2.5 text-xs text-[#4b5a4f] leading-relaxed">
-            <Info className="w-4 h-4 text-[#15803d] shrink-0 mt-0.5" />
+          <div className="p-3.5 rounded-xl bg-[#141418] border border-white/10 flex items-start gap-2.5 text-xs text-[#A5A1A4] leading-relaxed">
+            <Info className="w-4 h-4 text-[#F02D50] shrink-0 mt-0.5" />
             <p>
-              Participants and spectators can open the direct link or enter the <strong>Spectator Pass</strong> on the TournX home page to view live scoreboards, match fixtures, and squad statistics without needing an account.
+              Participants and spectators can open the direct link or enter the <strong className="text-[#F0E9E7]">Spectator Pass</strong> on the TournX home page to view live scoreboards, match fixtures, and squad statistics without needing an account.
             </p>
           </div>
 
@@ -211,9 +211,9 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
             <button
               type="button"
               onClick={handleNativeShare}
-              className="w-full py-3 px-4 rounded-xl bg-[#0f1712] hover:bg-[#1e2d24] text-[#faf9f5] font-semibold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
+              className="w-full py-3 px-4 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-[0_2px_12px_rgba(240, 45, 80,0.35)]"
             >
-              <Share2 className="w-4 h-4 text-[#10b981]" />
+              <Share2 className="w-4 h-4" />
               <span>{shareSuccess ? 'Shared Successfully!' : 'Share via Android / Apps'}</span>
             </button>
           </div>
