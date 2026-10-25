@@ -33,13 +33,13 @@ export default {
           600: '#4D293B',
         },
         crimson: {
-          DEFAULT: '#F02D50',
-          vivid: '#F02D50',
-          light: '#FF476B',
-          hover: '#FF3358',
+          DEFAULT: '#D72645',
+          vivid: '#D72645',
+          light: '#E63956',
+          hover: '#C21D3A',
           deep: '#991B35',
           dark: '#731428',
-          glow: 'rgba(240, 45, 80, 0.35)',
+          glow: 'rgba(215, 38, 69, 0.35)',
         },
         silver: {
           DEFAULT: '#F0E9E7',
@@ -47,7 +47,7 @@ export default {
           bright: '#F7F3F2',
           soft: '#F0E9E7',
           muted: '#A5A1A4',
-          dim: '#6E6A6D',
+          dim: '#736F72',
           dark: '#3A3739',
         },
         // Retain backward compatibility aliases mapped to the new palette

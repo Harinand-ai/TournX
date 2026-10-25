@@ -58,7 +58,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
         </button>
 
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-xl bg-[#21191D] text-[#F02D50] flex items-center justify-center mx-auto border border-[#F02D50]/40 shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-[#21191D] text-[#D72645] flex items-center justify-center mx-auto border border-[#D72645]/40 shadow-sm">
             <KeyRound className="w-6 h-6" />
           </div>
           <h3 className="text-lg font-display font-bold uppercase tracking-wider text-[#F0E9E7]">
@@ -70,8 +70,8 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
         </div>
 
         {grantedRole ? (
-          <div className="p-5 rounded-xl bg-[#21191D] border border-[#F02D50]/50 text-center space-y-2">
-            <CheckCircle className="w-8 h-8 text-[#F02D50] mx-auto animate-bounce" />
+          <div className="p-5 rounded-xl bg-[#21191D] border border-[#D72645]/50 text-center space-y-2">
+            <CheckCircle className="w-8 h-8 text-[#D72645] mx-auto animate-bounce" />
             <div className="text-sm font-mono font-bold text-[#F0E9E7] uppercase tracking-widest">
               Pass Verified: {grantedRole} Role
             </div>
@@ -87,13 +87,13 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
               </label>
               <input
                 type="text"
-                maxLength={16}
+                maxLength={24}
                 value={code}
                 onChange={e => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. TX-VIEW-9876"
+                placeholder="e.g. TX-VIEW-XXXXXX"
                 autoFocus
                 required
-                className="w-full px-4 py-3 rounded-xl bg-[#101013] border border-white/10 text-center font-mono text-lg tracking-widest font-bold text-[#F02D50] placeholder:text-[#6E6A6D] focus:border-[#F02D50] focus:outline-none uppercase"
+                className="w-full px-4 py-3 rounded-xl bg-[#101013] border border-white/10 text-center font-mono text-lg tracking-widest font-bold text-[#D72645] placeholder:text-[#736F72] focus:border-[#D72645] focus:outline-none uppercase"
               />
             </div>
 
@@ -105,7 +105,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
             )}
 
             <div className="p-3 rounded-xl bg-[#141418] border border-white/10 text-[11px] text-[#A5A1A4] flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#F02D50] shrink-0 mt-0.5" />
+              <ShieldCheck className="w-4 h-4 text-[#D72645] shrink-0 mt-0.5" />
               <span>
                 Enter a <strong className="text-[#F0E9E7]">SCORE</strong> pass to edit match scores, or a <strong className="text-[#F0E9E7]">VIEW</strong> pass to unlock private fixtures.
               </span>
@@ -114,7 +114,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
             <button
               type="submit"
               disabled={loading || code.trim().length < 4}
-              className="w-full py-3 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] disabled:opacity-40 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(240, 45, 80,0.3)] cursor-pointer"
+              className="w-full py-3 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] disabled:opacity-40 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-[0_2px_10px_rgba(215,38,69,0.3)] cursor-pointer"
             >
               {loading ? 'Verifying Pass...' : 'Unlock Matchday Access'}
             </button>

@@ -155,12 +155,17 @@ export function App() {
   });
 
 
-  // Intro state: Show arcade opening animation on launch (unless suppressed with ?intro=false)
+  // Intro state: Show opening animation on launch once per session (respecting ?intro=false / ?intro=true)
   const [showIntro, setShowIntro] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('intro') === 'false') return false;
-    return true;
+    if (urlParams.get('intro') === 'true') return true;
+    try {
+      return sessionStorage.getItem('ftm_intro_seen_session') !== 'true';
+    } catch {
+      return true;
+    }
   });
 
   // Wizard initial data passed from organizer sign up or workspace prompt
@@ -571,6 +576,7 @@ export function App() {
               matches={matches}
               players={players}
               standings={standings}
+              currentUserId={currentUserId}
               onDataChanged={loadData}
               onNavigateHome={() => handleNavigate('landing')}
               onNavigateToCreate={(prompt) => {
@@ -581,6 +587,7 @@ export function App() {
               }}
               onTournamentDeleted={handleTournamentDeleted}
               onLogout={handleAdminLogout}
+              onOpenTournamentSwitcher={() => setIsSwitcherOpen(true)}
             />
           </AdminAuthGuard>
         );
@@ -739,33 +746,38 @@ export function App() {
         <OpeningAnimation onComplete={handleIntroComplete} />
       )}
 
-      {/* Main Broadcast Navigation */}
-      <Navbar
-        currentTab={currentTab}
-        onNavigate={handleNavigate}
-        isAdminLoggedIn={isAdminLoggedIn}
-        activeTournamentName={activeTournament?.name}
-        sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
-        onShareTournament={() => setIsGlobalShareOpen(true)}
-        onLogout={handleAdminLogout}
-      />
+      {/* Main Broadcast Navigation (Hidden on landing page) */}
+      {currentTab !== 'landing' && (
+        <Navbar
+          currentTab={currentTab}
+          onNavigate={handleNavigate}
+          isAdminLoggedIn={isAdminLoggedIn}
+          activeTournamentName={activeTournament?.name}
+          onOpenTournamentSwitcher={() => setIsSwitcherOpen(true)}
+          sessionRole={isAdminLoggedIn ? 'ORGANIZER' : sessionRole !== 'ANONYMOUS' ? sessionRole : undefined}
+          onShareTournament={() => setIsGlobalShareOpen(true)}
+          onLogout={handleAdminLogout}
+        />
+      )}
 
       {/* Main Page Body with Genuine 3D Page Transitions */}
-      <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-20 md:pb-8">
+      <main className={`flex-1 w-full ${currentTab === 'landing' ? 'max-w-full p-0' : 'max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-20 md:pb-8'}`}>
         <PageTransition3D transitionKey={currentTab + (activeParam || '') + (activeTournament?.id || '')} type="turn">
           {renderCurrentPage()}
         </PageTransition3D>
       </main>
 
-      {/* Footer */}
-      <Footer onNavigate={handleNavigate} />
+      {/* Footer (Hidden on landing page) */}
+      {currentTab !== 'landing' && <Footer onNavigate={handleNavigate} />}
 
       {/* Mobile Floating Bottom Bar for Handheld Phones (390px - 430px) */}
-      <MobileBottomNav
-        currentTab={currentTab}
-        onNavigate={handleNavigate}
-        onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
-      />
+      {currentTab !== 'landing' && (
+        <MobileBottomNav
+          currentTab={currentTab}
+          onNavigate={handleNavigate}
+          onOpenLiveWindow={() => setIsLiveWindowOpen(true)}
+        />
+      )}
 
       {/* Share Tournament Modal */}
       <ShareTournamentModal

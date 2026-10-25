@@ -7,14 +7,14 @@
     --color-obsidian: #101013;
     --color-charcoal: #19191F;
     --color-burgundy: #21191D;
-    --color-crimson: #F02D50;
-    --color-crimson-vivid: #F02D50;
+    --color-crimson: #D72645;
+    --color-crimson-vivid: #D72645;
     --color-crimson-deep: #991B35;
     --color-silver: #F0E9E7;
     --color-muted: #A5A1A4;
     --border-subtle: rgba(240, 233, 231, 0.08);
     --border-strong: rgba(240, 233, 231, 0.16);
-    --border-crimson: rgba(240, 45, 80, 0.4);
+    --border-crimson: rgba(215, 38, 69, 0.4);
   }
 
   html {
@@ -29,13 +29,13 @@
     color: #F0E9E7 !important;
     min-height: 100vh;
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
-    selection-background-color: rgba(240, 45, 80, 0.35);
+    selection-background-color: rgba(215, 38, 69, 0.35);
     selection-color: #F0E9E7;
     letter-spacing: -0.01em;
   }
 
   ::placeholder {
-    color: #6E6A6D;
+    color: #736F72;
     opacity: 1;
   }
 
@@ -116,10 +116,10 @@
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .obsidian-card-interactive:hover {
-  border-color: rgba(240, 45, 80, 0.35);
+  border-color: rgba(215, 38, 69, 0.35);
   background-color: #201F28;
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(240, 45, 80, 0.08);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 20px rgba(215, 38, 69, 0.08);
 }
 
 .obsidian-card-subtle {
@@ -130,34 +130,34 @@
 
 .obsidian-card-burgundy {
   background-color: #21191D;
-  border: 1px solid rgba(240, 45, 80, 0.22);
+  border: 1px solid rgba(215, 38, 69, 0.22);
   border-radius: 0.875rem;
   box-shadow: 0 6px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
 .obsidian-card-live {
   background-color: #1C1418;
-  border: 1px solid rgba(240, 45, 80, 0.5);
+  border: 1px solid rgba(215, 38, 69, 0.5);
   border-radius: 0.875rem;
-  box-shadow: 0 4px 24px -2px rgba(240, 45, 80, 0.2), inset 0 0 20px rgba(240, 45, 80, 0.05);
+  box-shadow: 0 4px 24px -2px rgba(215, 38, 69, 0.2), inset 0 0 20px rgba(215, 38, 69, 0.05);
 }
 
 /* Architectural Buttons */
 .btn-crimson-primary {
-  background-color: #F02D50;
+  background-color: #D72645;
   color: #F0E9E7;
-  border: 1px solid #F02D50;
+  border: 1px solid #D72645;
   border-radius: 0.625rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   transition: all 0.18s ease;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(240, 45, 80, 0.25);
+  box-shadow: 0 2px 10px rgba(215, 38, 69, 0.25);
 }
 .btn-crimson-primary:hover {
-  background-color: #FF3358;
-  border-color: #FF3358;
-  box-shadow: 0 4px 16px rgba(240, 45, 80, 0.4);
+  background-color: #C21D3A;
+  border-color: #C21D3A;
+  box-shadow: 0 4px 16px rgba(215, 38, 69, 0.4);
   transform: translateY(-1px);
 }
 .btn-crimson-primary:active {

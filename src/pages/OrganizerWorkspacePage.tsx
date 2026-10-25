@@ -23,9 +23,12 @@ import {
   CheckCircle2,
   Loader2,
   FileText,
-  Calendar
+  Calendar,
+  ChevronDown,
+  Trophy
 } from 'lucide-react';
 import { Tournament } from '../types/multiTenant';
+import { DEFAULT_RULES_CONFIG } from '../engine/tournamentEngine';
 import { Team, Match, Player, Goal, ManOfTheMatch } from '../types/tournament';
 import { tournamentService } from '../services/tournamentService';
 import { TournamentInvite, localDataService, FTM_STORAGE_KEYS } from '../services/localDataService';
@@ -39,32 +42,50 @@ import { ShareTournamentModal } from '../components/ShareTournamentModal';
 import { PageTransition3D } from '../components/PageTransition3D';
 
 interface OrganizerWorkspacePageProps {
-  tournament: Tournament;
+  tournament: Tournament | null;
   teams: Team[];
   matches: Match[];
   players: Player[];
   standings: any[];
+  currentUserId?: string | null;
   onDataChanged: () => void;
   onNavigateHome: () => void;
   onNavigateToCreate?: (prompt?: string) => void;
   onTournamentDeleted?: (nextTournamentId: string) => void;
   onLogout: () => void;
+  onOpenTournamentSwitcher?: () => void;
 }
 
 type WorkspaceTab = 'overview' | 'matches' | 'standings' | 'teams' | 'stats' | 'collaborators' | 'settings';
 
 export function OrganizerWorkspacePage({
-  tournament,
+  tournament: propTournament,
   teams,
   matches,
   players,
   standings,
+  currentUserId,
   onDataChanged,
   onNavigateHome,
   onNavigateToCreate,
   onTournamentDeleted,
-  onLogout
+  onLogout,
+  onOpenTournamentSwitcher
 }: OrganizerWorkspacePageProps) {
+  const tournament: Tournament = propTournament || {
+    id: '',
+    name: 'No Tournament Selected',
+    slug: '',
+    description: '',
+    season: '2026',
+    logo_url: null,
+    status: 'DRAFT',
+    visibility: 'PRIVATE',
+    rules_config: { ...DEFAULT_RULES_CONFIG },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   // Navigation Tabs: Overview, Matches, Standings, Teams, Stats, Collaborators, Settings
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('overview');
 
@@ -85,14 +106,20 @@ export function OrganizerWorkspacePage({
   const [goals, setGoals] = useState<Goal[]>([]);
   const [motms, setMotms] = useState<ManOfTheMatch[]>([]);
 
+  const [isTutorialDropdownOpen, setIsTutorialDropdownOpen] = useState(false);
+  const [organizerTournaments, setOrganizerTournaments] = useState<Tournament[]>([]);
+  const [isLoadingOrganizerTournaments, setIsLoadingOrganizerTournaments] = useState(true);
+
   const loadMatchEvents = () => {
-    tournamentService.getGoals(tournament.id).then(setGoals);
-    tournamentService.getManOfTheMatches(tournament.id).then(setMotms);
+    if (tournament?.id) {
+      tournamentService.getGoals(tournament.id).then(setGoals);
+      tournamentService.getManOfTheMatches(tournament.id).then(setMotms);
+    }
   };
 
   useEffect(() => {
     loadMatchEvents();
-  }, [tournament.id]);
+  }, [tournament?.id]);
 
   // Collaborators & Invitations state
   const [invites, setInvites] = useState<TournamentInvite[]>([]);
@@ -103,8 +130,12 @@ export function OrganizerWorkspacePage({
 
   // Load Invites on mount or tournament change
   useEffect(() => {
-    tournamentService.getInvites(tournament.id).then(setInvites);
-  }, [tournament.id]);
+    if (tournament?.id) {
+      tournamentService.getInvites(tournament.id).then(setInvites);
+    } else {
+      setInvites([]);
+    }
+  }, [tournament?.id]);
 
   // Media Modal state
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -119,10 +150,15 @@ export function OrganizerWorkspacePage({
   const [userTournamentsCount, setUserTournamentsCount] = useState<number>(1);
 
   useEffect(() => {
-    tournamentService.getTournaments().then(list => {
+    setIsLoadingOrganizerTournaments(true);
+    tournamentService.getOrganizerTournaments(currentUserId || undefined).then(list => {
+      setOrganizerTournaments(list);
       setUserTournamentsCount(list.length);
-    }).catch(() => {});
-  }, [tournament.id]);
+      setIsLoadingOrganizerTournaments(false);
+    }).catch(() => {
+      setIsLoadingOrganizerTournaments(false);
+    });
+  }, [currentUserId, tournament?.id]);
 
   // Master Prompt Tournament Creator (Central Visual Centerpiece)
   const [masterPromptText, setMasterPromptText] = useState('');
@@ -286,6 +322,7 @@ export function OrganizerWorkspacePage({
   };
 
   const detectedPitchFormat = useMemo<FootballGroundFormat>(() => {
+    if (!tournament) return '11-a-side';
     const pCount = tournament.rules_config?.starting_players_per_team;
     if (pCount === 5) return '5-a-side';
     if (pCount === 6) return '6-a-side';
@@ -416,7 +453,7 @@ export function OrganizerWorkspacePage({
             name: teamName,
             short_name: teamName.substring(0, 3).toUpperCase(),
             manager_name: '',
-            primary_color: '#F02D50',
+            primary_color: '#D72645',
             secondary_color: '#101013',
           },
           tournament.id
@@ -505,61 +542,178 @@ export function OrganizerWorkspacePage({
   return (
     <div className="w-full max-w-6xl mx-auto py-5 px-3 sm:px-6 space-y-6 text-[#F0E9E7]">
       
-      {/* Top Banner: Tournament Name, Live Status & Quick Share */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-[#19191F] border border-white/10 shadow-2xl relative overflow-hidden">
-        {/* Subtle Burgundy Depth Corner Ambient Glow */}
-        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-[#21191D]/80 via-[#F02D50]/10 to-transparent pointer-events-none" />
-
-        <div className="min-w-0 relative z-10">
+      {/* Optional Compact Tutorial Dropdown (Closed by default) */}
+      <div className="rounded-2xl bg-[#19191F] border border-white/10 overflow-hidden shadow-lg transition">
+        <button
+          type="button"
+          onClick={() => setIsTutorialDropdownOpen(prev => !prev)}
+          className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-white/[0.02] transition cursor-pointer"
+        >
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-[#F0E9E7] tracking-tight truncate">
-              {tournament.name}
-            </h1>
-            <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider flex items-center gap-1.5 ${
-              tournament.status === 'IN_PROGRESS' || tournament.status === 'COMPLETED'
-                ? 'bg-[#21191D] text-[#F02D50] border-[#F02D50]/40'
-                : 'bg-[#141418] text-[#A5A1A4] border-white/10'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                tournament.status === 'IN_PROGRESS' ? 'bg-[#F02D50] animate-ping' : 'bg-[#A5A1A4]'
-              }`} />
-              {tournament.status}
+            <div className="w-7 h-7 rounded-lg bg-[#21191D] border border-[#D72645]/40 flex items-center justify-center text-[#D72645]">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-[#F0E9E7] uppercase tracking-wider font-mono">
+                TournX Quick Guide (6 Steps)
+              </h3>
+              <p className="text-[11px] text-[#A5A1A4]">
+                How to create and run professional football tournaments
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono uppercase text-[#D72645] bg-[#21191D] px-2 py-0.5 rounded border border-[#D72645]/30">
+              {isTutorialDropdownOpen ? 'Collapse' : 'Expand Guide'}
             </span>
+            <ChevronDown className={`w-4 h-4 text-[#A5A1A4] transition-transform duration-200 ${isTutorialDropdownOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {isTutorialDropdownOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="px-5 pb-5 pt-1 border-t border-white/5 bg-[#141418]"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
+                {[
+                  { step: '1', title: 'Enter Prompt Details', desc: 'Type natural language prompt with team names, dates, venue, and format.' },
+                  { step: '2', title: 'Review Preview', desc: 'Inspect the extracted tournament rules, teams, and tournament structure.' },
+                  { step: '3', title: 'Refine Squads & Times', desc: 'Edit squads, players, captains, schedule dates, and kick-off times.' },
+                  { step: '4', title: 'Confirm & Create', desc: 'Confirm creation to save tournament to your organizer dashboard.' },
+                  { step: '5', title: 'Manage Matches & Standings', desc: 'Record live match scores, goalscorers, cards, and update standings.' },
+                  { step: '6', title: 'Share Real-Time Access', desc: 'Share read-only participant codes or invite collaborators to update scores.' }
+                ].map((item) => (
+                  <div key={item.step} className="p-3.5 rounded-xl bg-[#19191F] border border-white/5 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#D72645]/20 text-[#D72645] text-[10px] font-mono font-bold flex items-center justify-center">
+                        {item.step}
+                      </span>
+                      <h4 className="text-xs font-semibold text-[#F0E9E7]">{item.title}</h4>
+                    </div>
+                    <p className="text-[11px] text-[#A5A1A4] leading-relaxed pl-7">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Fresh Organizer Empty State (When no tournaments exist for current organizer) */}
+      {(!propTournament || (currentUserId && userTournamentsCount === 0)) ? (
+        <div className="p-8 sm:p-12 rounded-2xl bg-[#19191F] border border-white/10 shadow-2xl text-center space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#D72645]/50 to-transparent" />
+          
+          <div className="w-16 h-16 rounded-2xl bg-[#21191D] border border-[#D72645]/40 text-[#D72645] flex items-center justify-center mx-auto shadow-lg shadow-[#D72645]/10">
+            <Trophy className="w-8 h-8" />
           </div>
 
-          <p className="text-xs text-[#A5A1A4] mt-1.5 flex items-center gap-2 font-mono">
-            <span>{tournament.visibility === 'PUBLIC' ? 'Public Tournament' : 'Private Tournament'}</span>
-            <span className="text-white/20">•</span>
-            <span>{teams.length} Teams</span>
-            <span className="text-white/20">•</span>
-            <span>{matches.length} Matches</span>
-            <span className="text-white/20">•</span>
-            <span>{tournament.season || '2026'}</span>
-          </p>
-        </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h2 className="text-xl sm:text-2xl font-extrabold font-display text-[#F0E9E7] tracking-tight">
+              No tournaments yet. Create your first tournament to get started.
+            </h2>
+            <p className="text-xs text-[#A5A1A4] leading-relaxed">
+              TournX is a modern tournament management engine powered by natural language. Type a prompt describing your teams, schedule, and rules to generate an entire competition with fixtures, squads, and live standings in seconds.
+            </p>
+          </div>
 
-        {/* Share Tournament Action */}
-        <div className="flex items-center gap-2 shrink-0 relative z-10">
-          <button
-            type="button"
-            onClick={() => setIsShareModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-[0_2px_12px_rgba(240, 45, 80,0.35)]"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share Tournament</span>
-          </button>
+          <div className="max-w-xl mx-auto space-y-4 pt-2">
+            <textarea
+              value={masterPromptText}
+              onChange={(e) => setMasterPromptText(e.target.value)}
+              placeholder="e.g. Create an 8-team weekend tournament with Arsenal, Chelsea, Liverpool, Spurs, Man City, Man United, Everton, and Aston Villa at college ground tomorrow 5 PM"
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] focus:ring-1 focus:ring-[#D72645]/30 placeholder:text-[#6E6A6D] transition resize-none leading-relaxed"
+            />
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onNavigateToCreate) {
+                    onNavigateToCreate(masterPromptText.trim() || undefined);
+                  }
+                }}
+                className="w-full sm:w-auto px-8 py-3 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white font-bold text-xs shadow-lg shadow-[#D72645]/30 transition cursor-pointer flex items-center justify-center gap-2 group"
+              >
+                <span>Get Started</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
+
+              {onOpenTournamentSwitcher && (
+                <button
+                  type="button"
+                  onClick={onOpenTournamentSwitcher}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#141418] hover:bg-[#202028] border border-white/10 text-[#A5A1A4] hover:text-[#F0E9E7] text-xs font-mono font-medium transition cursor-pointer"
+                >
+                  Select Tournament
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Top Banner: Tournament Name, Live Status & Quick Share */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-[#19191F] border border-white/10 shadow-2xl relative overflow-hidden">
+            {/* Subtle Burgundy Depth Corner Ambient Glow */}
+            <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-[#21191D]/80 via-[#D72645]/10 to-transparent pointer-events-none" />
+
+            <div className="min-w-0 relative z-10">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-[#F0E9E7] tracking-tight truncate">
+                  {tournament.name}
+                </h1>
+                <span className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider flex items-center gap-1.5 ${
+                  tournament.status === 'IN_PROGRESS' || tournament.status === 'COMPLETED'
+                    ? 'bg-[#21191D] text-[#D72645] border-[#D72645]/40'
+                    : 'bg-[#141418] text-[#A5A1A4] border-white/10'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    tournament.status === 'IN_PROGRESS' ? 'bg-[#D72645] animate-ping' : 'bg-[#A5A1A4]'
+                  }`} />
+                  {tournament.status}
+                </span>
+              </div>
+
+              <p className="text-xs text-[#A5A1A4] mt-1.5 flex items-center gap-2 font-mono">
+                <span>{tournament.visibility === 'PUBLIC' ? 'Public Tournament' : 'Private Tournament'}</span>
+                <span className="text-white/20">•</span>
+                <span>{teams.length} Teams</span>
+                <span className="text-white/20">•</span>
+                <span>{matches.length} Matches</span>
+                <span className="text-white/20">•</span>
+                <span>{tournament.season || '2026'}</span>
+              </p>
+            </div>
+
+            {/* Share Tournament Action */}
+            <div className="flex items-center gap-2 shrink-0 relative z-10">
+              <button
+                type="button"
+                onClick={() => setIsShareModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white text-xs font-bold flex items-center gap-2 transition cursor-pointer shadow-[0_2px_12px_rgba(215, 38, 69,0.35)]"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share Tournament</span>
+              </button>
+            </div>
+          </div>
 
       {/* Visual Centerpiece: Master Tournament Prompt Creator (Integrated seamlessly) */}
       <div className="relative p-6 sm:p-7 rounded-2xl bg-[#19191F] border border-white/10 shadow-xl overflow-hidden">
         {/* Subtle crimson accent line */}
-        <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#F02D50]/50 to-transparent" />
+        <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#D72645]/50 to-transparent" />
         
         <div className="relative z-10 max-w-3xl mx-auto space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141418] border border-white/10 text-[#F0E9E7] text-xs font-mono font-semibold w-fit">
-              <Sparkles className="w-3.5 h-3.5 text-[#F02D50]" />
+              <Sparkles className="w-3.5 h-3.5 text-[#D72645]" />
               <span>Prompt Engine</span>
             </div>
             
@@ -568,10 +722,10 @@ export function OrganizerWorkspacePage({
               onClick={() => setIsDraftsModalOpen(true)}
               className="px-3.5 py-1.5 rounded-xl bg-[#141418] hover:bg-[#202028] border border-white/10 text-[#A5A1A4] hover:text-[#F0E9E7] text-xs font-mono font-medium flex items-center gap-1.5 transition cursor-pointer w-fit"
             >
-              <FileText className="w-3.5 h-3.5 text-[#F02D50]" />
+              <FileText className="w-3.5 h-3.5 text-[#D72645]" />
               <span>Saved Drafts</span>
               {draftsCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#F02D50]/20 text-[#F02D50] text-[10px] font-bold">
+                <span className="px-1.5 py-0.2 rounded-full bg-[#D72645]/20 text-[#D72645] text-[10px] font-bold">
                   {draftsCount}
                 </span>
               )}
@@ -593,7 +747,7 @@ export function OrganizerWorkspacePage({
               onChange={(e) => setMasterPromptText(e.target.value)}
               placeholder="e.g. Create an 8-team tournament with Arsenal, Chelsea, Liverpool, Spurs, Man City, Man United, Everton and Aston Villa at college ground tomorrow 5 pm"
               rows={3}
-              className="w-full px-4 py-3 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] focus:ring-1 focus:ring-[#F02D50]/30 font-sans placeholder:text-[#6E6A6D] transition shadow-inner resize-none leading-relaxed"
+              className="w-full px-4 py-3 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] focus:ring-1 focus:ring-[#D72645]/30 font-sans placeholder:text-[#6E6A6D] transition shadow-inner resize-none leading-relaxed"
             />
 
             {/* Actions */}
@@ -612,7 +766,7 @@ export function OrganizerWorkspacePage({
                 type="button"
                 onClick={handleLaunchMasterPrompt}
                 disabled={!masterPromptText.trim()}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 group"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 group"
               >
                 <span>Generate Preview</span>
                 <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
@@ -620,7 +774,7 @@ export function OrganizerWorkspacePage({
             </div>
 
             {draftNotice && (
-              <p className="text-xs text-[#F02D50] text-center pt-1 font-mono font-medium animate-pulse">
+              <p className="text-xs text-[#D72645] text-center pt-1 font-mono font-medium animate-pulse">
                 {draftNotice}
               </p>
             )}
@@ -631,8 +785,8 @@ export function OrganizerWorkspacePage({
       {/* Operational Assistant Command Box (Natural Language for active tournament) */}
       <div className="p-5 rounded-2xl bg-[#19191F] border border-white/10 shadow-lg">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#F02D50] uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-[#F02D50]" />
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#D72645] uppercase tracking-wider">
+            <Sparkles className="w-4 h-4 text-[#D72645]" />
             <span>Management Assistant</span>
           </div>
           <span className="text-[11px] text-[#A5A1A4] hidden sm:inline font-mono">
@@ -647,14 +801,14 @@ export function OrganizerWorkspacePage({
             onChange={(e) => setCommandPrompt(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAnalyzeCommand()}
             placeholder="e.g. Move Match 1 to Saturday at 4 PM, or Set score 2-1 for FC Goa vs Chennaiyin FC"
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] font-sans placeholder:text-[#6E6A6D] transition"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] font-sans placeholder:text-[#6E6A6D] transition"
           />
 
           <button
             type="button"
             disabled={!commandPrompt.trim() || isAnalyzingCommand}
             onClick={handleAnalyzeCommand}
-            className="shrink-0 px-5 py-2.5 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 font-mono"
+            className="shrink-0 px-5 py-2.5 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white font-bold text-xs shadow-md transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 font-mono"
           >
             {isAnalyzingCommand ? (
               <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
@@ -669,8 +823,8 @@ export function OrganizerWorkspacePage({
 
         {/* Notices */}
         {commandSuccessNotice && (
-          <div className="mt-3 p-3 rounded-xl bg-[#21191D] border border-[#F02D50]/40 text-[#F0E9E7] text-xs flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-[#F02D50] shrink-0" />
+          <div className="mt-3 p-3 rounded-xl bg-[#21191D] border border-[#D72645]/40 text-[#F0E9E7] text-xs flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-[#D72645] shrink-0" />
             <span>{commandSuccessNotice}</span>
           </div>
         )}
@@ -693,14 +847,14 @@ export function OrganizerWorkspacePage({
               exit={{ scale: 0.95, opacity: 0 }}
               className="w-full max-w-md p-6 rounded-2xl bg-[#19191F] border border-white/10 shadow-2xl space-y-4 text-[#F0E9E7]"
             >
-              <div className="flex items-center gap-2 text-[#F02D50] font-mono font-bold text-sm">
-                <Sparkles className="w-4 h-4 text-[#F02D50]" />
+              <div className="flex items-center gap-2 text-[#D72645] font-mono font-bold text-sm">
+                <Sparkles className="w-4 h-4 text-[#D72645]" />
                 <span>Confirm Proposed Command</span>
               </div>
 
               <div className="p-4 rounded-xl bg-[#101013] border border-white/10 text-xs space-y-2">
                 <div className="text-[#F0E9E7] font-medium">{commandProposal.description}</div>
-                <div className="text-xs text-[#F02D50] font-mono font-semibold">
+                <div className="text-xs text-[#D72645] font-mono font-semibold">
                   Action: {commandProposal.actionType}
                 </div>
               </div>
@@ -717,7 +871,7 @@ export function OrganizerWorkspacePage({
                 <button
                   type="button"
                   onClick={handleApplyCommand}
-                  className="px-5 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-mono font-bold transition cursor-pointer shadow-md"
+                  className="px-5 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white text-xs font-mono font-bold transition cursor-pointer shadow-md"
                 >
                   Apply Change
                 </button>
@@ -744,7 +898,7 @@ export function OrganizerWorkspacePage({
             onClick={() => setActiveTab(tab.id as WorkspaceTab)}
             className={`px-4 py-2 rounded-xl whitespace-nowrap transition cursor-pointer ${
               activeTab === tab.id
-                ? 'bg-[#21191D] text-[#F0E9E7] border border-[#F02D50]/40 shadow-sm'
+                ? 'bg-[#21191D] text-[#F0E9E7] border border-[#D72645]/40 shadow-sm'
                 : 'text-[#A5A1A4] hover:text-[#F0E9E7] hover:bg-[#19191F]'
             }`}
           >
@@ -768,10 +922,10 @@ export function OrganizerWorkspacePage({
 
             {/* LIVE MATCHES HERO (Distinctive crimson live pulse) */}
             {liveMatches.length > 0 && (
-              <div className="p-5 rounded-2xl bg-[#1C1418] border border-[#F02D50]/60 space-y-3 shadow-[0_8px_30px_rgba(240, 45, 80,0.2)]">
+              <div className="p-5 rounded-2xl bg-[#1C1418] border border-[#D72645]/60 space-y-3 shadow-[0_8px_30px_rgba(215, 38, 69,0.2)]">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-[#F02D50] font-mono font-bold text-xs uppercase tracking-wider">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#F02D50] animate-ping" />
+                  <div className="flex items-center gap-2 text-[#D72645] font-mono font-bold text-xs uppercase tracking-wider">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#D72645] animate-ping" />
                     <span>Live Matches In Progress ({liveMatches.length})</span>
                   </div>
                   <span className="text-[11px] font-mono text-[#A5A1A4]">Live updates enabled</span>
@@ -784,12 +938,12 @@ export function OrganizerWorkspacePage({
                     <div key={m.id} className="flex items-center justify-between p-4 rounded-xl bg-[#101013] border border-white/10 shadow-sm">
                       <div className="flex-1 font-bold text-[#F0E9E7] text-sm truncate">{home}</div>
                       
-                      <div className="px-4 py-1.5 bg-[#21191D] border border-[#F02D50]/40 rounded-xl flex items-center gap-2 mx-3">
-                        <span className="font-score text-xl font-extrabold text-[#F02D50]">
+                      <div className="px-4 py-1.5 bg-[#21191D] border border-[#D72645]/40 rounded-xl flex items-center gap-2 mx-3">
+                        <span className="font-score text-xl font-extrabold text-[#D72645]">
                           {m.home_score ?? 0}
                         </span>
                         <span className="text-[#A5A1A4] font-mono text-xs">-</span>
-                        <span className="font-score text-xl font-extrabold text-[#F02D50]">
+                        <span className="font-score text-xl font-extrabold text-[#D72645]">
                           {m.away_score ?? 0}
                         </span>
                       </div>
@@ -799,7 +953,7 @@ export function OrganizerWorkspacePage({
                       <button
                         type="button"
                         onClick={() => handleOpenScoreModal(m)}
-                        className="ml-4 px-3 py-1.5 rounded-lg bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-mono font-bold transition cursor-pointer shadow-sm"
+                        className="ml-4 px-3 py-1.5 rounded-lg bg-[#D72645] hover:bg-[#C21D3A] text-white text-xs font-mono font-bold transition cursor-pointer shadow-sm"
                       >
                         Edit
                       </button>
@@ -812,8 +966,8 @@ export function OrganizerWorkspacePage({
             {/* NEXT SCHEDULED FIXTURE (Distinctive Composition, visually different from ordinary rows) */}
             <div className="p-6 rounded-2xl bg-gradient-to-br from-[#1E1920] via-[#19191F] to-[#141418] border border-white/10 shadow-xl space-y-4 relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
-                <span className="text-xs font-mono font-bold text-[#F02D50] uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-[#F02D50]" /> Next Scheduled Fixture
+                <span className="text-xs font-mono font-bold text-[#D72645] uppercase tracking-wider flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-[#D72645]" /> Next Scheduled Fixture
                 </span>
                 {nextMatch && (
                   <span className="text-[11px] font-mono text-[#A5A1A4]">
@@ -833,7 +987,7 @@ export function OrganizerWorkspacePage({
                           {home}
                         </div>
                         <div className="col-span-1 flex justify-center">
-                          <span className="px-2.5 py-1 rounded-md bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] font-mono text-xs font-extrabold">
+                          <span className="px-2.5 py-1 rounded-md bg-[#21191D] border border-[#D72645]/40 text-[#D72645] font-mono text-xs font-extrabold">
                             VS
                           </span>
                         </div>
@@ -845,11 +999,11 @@ export function OrganizerWorkspacePage({
                       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/[0.08] text-xs text-[#A5A1A4]">
                         <div className="flex items-center gap-3">
                           <span className="flex items-center gap-1.5 font-mono">
-                            <Calendar className="w-3.5 h-3.5 text-[#F02D50]" />
+                            <Calendar className="w-3.5 h-3.5 text-[#D72645]" />
                             <span>{nextMatch.scheduled_date || 'Date TBA'}</span>
                           </span>
                           <span className="flex items-center gap-1.5 font-mono">
-                            <Clock className="w-3.5 h-3.5 text-[#F02D50]" />
+                            <Clock className="w-3.5 h-3.5 text-[#D72645]" />
                             <span>{nextMatch.scheduled_time || 'Time TBA'}</span>
                           </span>
                         </div>
@@ -857,7 +1011,7 @@ export function OrganizerWorkspacePage({
                         <button
                           type="button"
                           onClick={() => handleOpenScoreModal(nextMatch)}
-                          className="px-4 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-mono font-bold transition cursor-pointer shadow-[0_2px_10px_rgba(240, 45, 80,0.3)]"
+                          className="px-4 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white text-xs font-mono font-bold transition cursor-pointer shadow-[0_2px_10px_rgba(215, 38, 69,0.3)]"
                         >
                           Record Match Score
                         </button>
@@ -890,7 +1044,7 @@ export function OrganizerWorkspacePage({
                     return (
                       <div key={m.id} className="p-3 rounded-xl bg-[#101013] border border-white/10 flex items-center justify-between text-xs">
                         <span className="font-semibold text-[#F0E9E7] truncate max-w-[130px] sm:max-w-[160px]">{home}</span>
-                        <span className="font-score font-bold text-sm text-[#F0E9E7] px-3 py-0.5 bg-[#21191D] border border-[#F02D50]/40 rounded-lg">
+                        <span className="font-score font-bold text-sm text-[#F0E9E7] px-3 py-0.5 bg-[#21191D] border border-[#D72645]/40 rounded-lg">
                           {m.home_score} - {m.away_score}
                         </span>
                         <span className="font-semibold text-[#F0E9E7] truncate max-w-[130px] sm:max-w-[160px] text-right">{away}</span>
@@ -912,7 +1066,7 @@ export function OrganizerWorkspacePage({
               <button
                 type="button"
                 onClick={() => setActiveTab('standings')}
-                className="text-[11px] font-mono text-[#F02D50] hover:underline cursor-pointer"
+                className="text-[11px] font-mono text-[#D72645] hover:underline cursor-pointer"
               >
                 Full Table &rarr;
               </button>
@@ -934,7 +1088,7 @@ export function OrganizerWorkspacePage({
                       <td className="py-2.5 font-mono text-[#A5A1A4]">{idx + 1}</td>
                       <td className="py-2.5 font-semibold text-[#F0E9E7] truncate max-w-[110px]">{st.team.name}</td>
                       <td className="py-2.5 text-center text-[#A5A1A4] font-mono">{st.played}</td>
-                      <td className="py-2.5 text-center font-score font-bold text-sm text-[#F02D50]">{st.points}</td>
+                      <td className="py-2.5 text-center font-score font-bold text-sm text-[#D72645]">{st.points}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -965,10 +1119,10 @@ export function OrganizerWorkspacePage({
                 <div
                   key={m.id}
                   onClick={() => handleOpenScoreModal(m)}
-                  className="p-3.5 sm:p-4 rounded-xl bg-[#141418] border border-white/10 hover:border-[#F02D50]/50 hover:bg-[#1D1B22] transition flex items-center justify-between cursor-pointer group shadow-sm"
+                  className="p-3.5 sm:p-4 rounded-xl bg-[#141418] border border-white/10 hover:border-[#D72645]/50 hover:bg-[#1D1B22] transition flex items-center justify-between cursor-pointer group shadow-sm"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-xs text-[#F02D50] bg-[#21191D] border border-[#F02D50]/30 px-2 py-0.5 rounded">
+                    <span className="font-mono text-xs text-[#D72645] bg-[#21191D] border border-[#D72645]/30 px-2 py-0.5 rounded">
                       R{m.round_number} M{m.match_number}
                     </span>
                     <span className="font-bold text-[#F0E9E7] text-sm truncate max-w-[130px] sm:max-w-[200px]">{home}</span>
@@ -984,22 +1138,22 @@ export function OrganizerWorkspacePage({
                           const p = mMotm ? players.find(pl => pl.id === mMotm.player_id) : null;
                           if (!p) return null;
                           return (
-                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#21191D] border border-[#F02D50]/30 text-[#F0E9E7] text-[11px] font-mono font-bold">
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#21191D] border border-[#D72645]/30 text-[#F0E9E7] text-[11px] font-mono font-bold">
                               ⭐ {p.name}
                             </span>
                           );
                         })()}
-                        <span className="font-score font-bold text-sm text-[#F0E9E7] bg-[#21191D] px-3 py-0.5 rounded-lg border border-[#F02D50]/40">
+                        <span className="font-score font-bold text-sm text-[#F0E9E7] bg-[#21191D] px-3 py-0.5 rounded-lg border border-[#D72645]/40">
                           {m.home_score} - {m.away_score}
                         </span>
                       </div>
                     ) : m.status === 'LIVE' ? (
-                      <span className="font-score font-bold text-sm text-[#F02D50] bg-[#21191D] px-3 py-0.5 rounded-lg border border-[#F02D50]/60 animate-pulse">
+                      <span className="font-score font-bold text-sm text-[#D72645] bg-[#21191D] px-3 py-0.5 rounded-lg border border-[#D72645]/60 animate-pulse">
                         {m.home_score ?? 0} - {m.away_score ?? 0} (LIVE)
                       </span>
                     ) : (
-                      <span className="text-xs text-[#A5A1A4] group-hover:text-[#F02D50] flex items-center gap-1 font-mono font-bold">
-                        <Edit className="w-3.5 h-3.5 text-[#F02D50]" />
+                      <span className="text-xs text-[#A5A1A4] group-hover:text-[#D72645] flex items-center gap-1 font-mono font-bold">
+                        <Edit className="w-3.5 h-3.5 text-[#D72645]" />
                         <span>Score</span>
                       </span>
                     )}
@@ -1037,7 +1191,7 @@ export function OrganizerWorkspacePage({
                   <th className="py-2.5 text-center w-8">GF</th>
                   <th className="py-2.5 text-center w-8">GA</th>
                   <th className="py-2.5 text-center w-9">GD</th>
-                  <th className="py-2.5 text-center w-10 font-bold text-[#F02D50] font-mono">Pts</th>
+                  <th className="py-2.5 text-center w-10 font-bold text-[#D72645] font-mono">Pts</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.05]">
@@ -1049,7 +1203,7 @@ export function OrganizerWorkspacePage({
                         {s.team.logo_url ? (
                           <img src={s.team.logo_url} alt={s.team.name} className="w-5 h-5 rounded-full object-contain" />
                         ) : (
-                          <div className="w-5 h-5 rounded-full bg-[#21191D] text-[#F02D50] border border-[#F02D50]/40 text-[10px] font-mono font-bold flex items-center justify-center">
+                          <div className="w-5 h-5 rounded-full bg-[#21191D] text-[#D72645] border border-[#D72645]/40 text-[10px] font-mono font-bold flex items-center justify-center">
                             {s.team.name.substring(0, 2).toUpperCase()}
                           </div>
                         )}
@@ -1065,7 +1219,7 @@ export function OrganizerWorkspacePage({
                     <td className="py-3 text-center text-[#A5A1A4] font-mono">
                       {s.goal_difference > 0 ? `+${s.goal_difference}` : s.goal_difference}
                     </td>
-                    <td className="py-3 text-center font-score font-black text-[#F02D50] text-sm">{s.points}</td>
+                    <td className="py-3 text-center font-score font-black text-[#D72645] text-sm">{s.points}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1085,7 +1239,7 @@ export function OrganizerWorkspacePage({
             <button
               type="button"
               onClick={() => setIsMediaModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white text-xs font-mono font-bold flex items-center gap-2 shadow-md transition cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white text-xs font-mono font-bold flex items-center gap-2 shadow-md transition cursor-pointer"
             >
               <UploadCloud className="w-4 h-4" />
               <span>Bulk Upload Media</span>
@@ -1107,7 +1261,7 @@ export function OrganizerWorkspacePage({
                           className="w-7 h-7 rounded-full object-contain border border-white/10 bg-[#101013] p-0.5"
                         />
                       ) : (
-                        <div className="w-7 h-7 rounded-full bg-[#21191D] border border-[#F02D50]/40 flex items-center justify-center text-[#F02D50]">
+                        <div className="w-7 h-7 rounded-full bg-[#21191D] border border-[#D72645]/40 flex items-center justify-center text-[#D72645]">
                           <Shield className="w-4 h-4" />
                         </div>
                       )}
@@ -1134,13 +1288,13 @@ export function OrganizerWorkspacePage({
                                 className="w-5 h-5 rounded-full object-cover border border-white/10 shrink-0"
                               />
                             ) : (
-                              <div className="w-5 h-5 rounded-full bg-[#21191D] shrink-0 flex items-center justify-center text-[9px] font-mono font-bold text-[#F02D50] border border-[#F02D50]/30">
+                              <div className="w-5 h-5 rounded-full bg-[#21191D] shrink-0 flex items-center justify-center text-[9px] font-mono font-bold text-[#D72645] border border-[#D72645]/30">
                                 {p.name.charAt(0)}
                               </div>
                             )}
                             <span className="font-medium text-[#F0E9E7]">{p.name} {p.is_captain && '★'}</span>
                           </div>
-                          <span className="font-mono text-[10px] text-[#F0E9E7] bg-[#21191D] border border-[#F02D50]/30 px-1.5 py-0.2 rounded font-bold">
+                          <span className="font-mono text-[10px] text-[#F0E9E7] bg-[#21191D] border border-[#D72645]/30 px-1.5 py-0.2 rounded font-bold">
                             {p.position}
                           </span>
                         </div>
@@ -1187,7 +1341,7 @@ export function OrganizerWorkspacePage({
         <div className="p-6 rounded-2xl bg-[#19191F] border border-white/10 shadow-xl space-y-6">
           <div>
             <h2 className="text-lg font-display font-bold text-[#F0E9E7] flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#F02D50]" />
+              <Users className="w-5 h-5 text-[#D72645]" />
               <span>Matchday Passes & Collaborators</span>
             </h2>
             <p className="text-xs text-[#A5A1A4] mt-1 font-sans">
@@ -1196,8 +1350,8 @@ export function OrganizerWorkspacePage({
           </div>
 
           {inviteFeedback && (
-            <div className="p-3.5 rounded-xl bg-[#21191D] border border-[#F02D50]/40 text-[#F0E9E7] text-xs flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-[#F02D50] shrink-0" />
+            <div className="p-3.5 rounded-xl bg-[#21191D] border border-[#D72645]/40 text-[#F0E9E7] text-xs flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-[#D72645] shrink-0" />
               <span>{inviteFeedback}</span>
             </div>
           )}
@@ -1216,7 +1370,7 @@ export function OrganizerWorkspacePage({
                   value={newInviteEmail}
                   onChange={(e) => setNewInviteEmail(e.target.value)}
                   placeholder="collaborator@example.com"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] placeholder-[#6E6A6D] font-sans"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] placeholder-[#6E6A6D] font-sans"
                 />
               </div>
 
@@ -1224,7 +1378,7 @@ export function OrganizerWorkspacePage({
                 <select
                   value={newInviteRole}
                   onChange={(e) => setNewInviteRole(e.target.value as any)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] font-mono cursor-pointer"
+                  className="w-full px-3 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] font-mono cursor-pointer"
                 >
                   <option value="SCORE">SCORE (Scorekeeper)</option>
                   <option value="ORGANIZER">ORGANIZER (Full)</option>
@@ -1236,7 +1390,7 @@ export function OrganizerWorkspacePage({
             <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white font-bold font-mono text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md"
+                className="px-4 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white font-bold font-mono text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Issue Pass</span>
@@ -1264,7 +1418,7 @@ export function OrganizerWorkspacePage({
                     <div className="space-y-0.5">
                       <div className="font-bold text-[#F0E9E7] flex items-center gap-2">
                         <span>{inv.email}</span>
-                        <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#F02D50]/40 text-[#F02D50] font-mono text-[10px]">
+                        <span className="px-2 py-0.5 rounded bg-[#21191D] border border-[#D72645]/40 text-[#D72645] font-mono text-[10px]">
                           {inv.role}
                         </span>
                       </div>
@@ -1313,7 +1467,7 @@ export function OrganizerWorkspacePage({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
               <div>
                 <h2 className="text-lg font-display font-bold text-[#F0E9E7] flex items-center gap-2">
-                  <Sliders className="w-5 h-5 text-[#F02D50]" />
+                  <Sliders className="w-5 h-5 text-[#D72645]" />
                   <span>Tournament Settings & Configuration</span>
                 </h2>
                 <p className="text-xs text-[#A5A1A4] mt-0.5 font-sans">
@@ -1325,7 +1479,7 @@ export function OrganizerWorkspacePage({
                 type="button"
                 onClick={handleSaveSettings}
                 disabled={isSavingSettings}
-                className="px-4 py-2 rounded-xl bg-[#F02D50] hover:bg-[#FF3358] text-white font-bold font-mono text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md disabled:opacity-50 shrink-0"
+                className="px-4 py-2 rounded-xl bg-[#D72645] hover:bg-[#C21D3A] text-white font-bold font-mono text-xs flex items-center gap-1.5 transition cursor-pointer shadow-md disabled:opacity-50 shrink-0"
               >
                 {isSavingSettings ? (
                   <>
@@ -1346,12 +1500,12 @@ export function OrganizerWorkspacePage({
               <div
                 className={`p-3.5 rounded-xl border flex items-center gap-2.5 text-xs ${
                   settingsFeedback.type === 'success'
-                    ? 'bg-[#21191D] border-[#F02D50]/40 text-[#F0E9E7]'
+                    ? 'bg-[#21191D] border-[#D72645]/40 text-[#F0E9E7]'
                     : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
                 }`}
               >
                 {settingsFeedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#F02D50] shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#D72645] shrink-0" />
                 ) : (
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                 )}
@@ -1373,7 +1527,7 @@ export function OrganizerWorkspacePage({
                     required
                     value={settingsName}
                     onChange={e => setSettingsName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] font-sans"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] font-sans"
                   />
                 </div>
 
@@ -1386,7 +1540,7 @@ export function OrganizerWorkspacePage({
                       type="text"
                       value={settingsSeason}
                       onChange={e => setSettingsSeason(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] font-mono"
                     />
                   </div>
 
@@ -1397,7 +1551,7 @@ export function OrganizerWorkspacePage({
                     <select
                       value={settingsStatus}
                       onChange={e => setSettingsStatus(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] font-mono cursor-pointer"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] font-mono cursor-pointer"
                     >
                       <option value="REGISTRATION">Registration</option>
                       <option value="IN_PROGRESS">In Progress</option>
@@ -1418,11 +1572,11 @@ export function OrganizerWorkspacePage({
                       onClick={() => setSettingsVisibility('PUBLIC')}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
                         settingsVisibility === 'PUBLIC'
-                          ? 'bg-[#21191D] border-[#F02D50] text-[#F0E9E7] font-bold'
+                          ? 'bg-[#21191D] border-[#D72645] text-[#F0E9E7] font-bold'
                           : 'bg-[#141418] border-white/10 text-[#A5A1A4] hover:bg-[#1A1A22]'
                       }`}
                     >
-                      <Globe className="w-4 h-4 text-[#F02D50] shrink-0" />
+                      <Globe className="w-4 h-4 text-[#D72645] shrink-0" />
                       <div>
                         <div className="text-xs font-mono font-semibold">Public</div>
                         <div className="text-[10px] text-[#A5A1A4]">Accessible to all visitors</div>
@@ -1434,7 +1588,7 @@ export function OrganizerWorkspacePage({
                       onClick={() => setSettingsVisibility('PRIVATE')}
                       className={`p-3 rounded-xl border text-left transition cursor-pointer flex items-center gap-2.5 ${
                         settingsVisibility === 'PRIVATE'
-                          ? 'bg-[#21191D] border-[#F02D50] text-[#F0E9E7] font-bold'
+                          ? 'bg-[#21191D] border-[#D72645] text-[#F0E9E7] font-bold'
                           : 'bg-[#141418] border-white/10 text-[#A5A1A4] hover:bg-[#1A1A22]'
                       }`}
                     >
@@ -1456,7 +1610,7 @@ export function OrganizerWorkspacePage({
                     value={settingsDescription}
                     onChange={e => setSettingsDescription(e.target.value)}
                     placeholder="Tournament overview, rules, and notes"
-                    className="w-full px-3.5 py-2 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#F02D50] resize-none font-sans"
+                    className="w-full px-3.5 py-2 rounded-xl bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs focus:outline-none focus:border-[#D72645] resize-none font-sans"
                   />
                 </div>
               </div>
@@ -1479,7 +1633,7 @@ export function OrganizerWorkspacePage({
                         max="10"
                         value={settingsWinPts}
                         onChange={e => setSettingsWinPts(parseInt(e.target.value, 10) || 0)}
-                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#F02D50] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#F02D50]"
+                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#D72645] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#D72645]"
                       />
                     </div>
                     <div>
@@ -1490,7 +1644,7 @@ export function OrganizerWorkspacePage({
                         max="10"
                         value={settingsDrawPts}
                         onChange={e => setSettingsDrawPts(parseInt(e.target.value, 10) || 0)}
-                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#F02D50] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#F02D50]"
+                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#D72645] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#D72645]"
                       />
                     </div>
                     <div>
@@ -1501,7 +1655,7 @@ export function OrganizerWorkspacePage({
                         max="10"
                         value={settingsLossPts}
                         onChange={e => setSettingsLossPts(parseInt(e.target.value, 10) || 0)}
-                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#F02D50] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#F02D50]"
+                        className="w-full px-2 py-1 bg-[#101013] border border-white/10 text-[#D72645] text-xs font-score font-bold text-center rounded-lg focus:outline-none focus:border-[#D72645]"
                       />
                     </div>
                   </div>
@@ -1516,7 +1670,7 @@ export function OrganizerWorkspacePage({
                       max="120"
                       value={settingsDuration}
                       onChange={e => setSettingsDuration(parseInt(e.target.value, 10) || 50)}
-                      className="w-full px-3 py-1.5 bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs font-score font-bold rounded-lg focus:outline-none focus:border-[#F02D50]"
+                      className="w-full px-3 py-1.5 bg-[#101013] border border-white/10 text-[#F0E9E7] text-xs font-score font-bold rounded-lg focus:outline-none focus:border-[#D72645]"
                     />
                   </div>
                 </div>
@@ -1545,7 +1699,7 @@ export function OrganizerWorkspacePage({
                         }}
                         className={`p-2.5 rounded-lg border transition cursor-pointer flex items-center justify-between select-none ${
                           active
-                            ? 'bg-[#21191D] border-[#F02D50]/40 text-[#F0E9E7]'
+                            ? 'bg-[#21191D] border-[#D72645]/40 text-[#F0E9E7]'
                             : 'bg-[#101013] border-white/10 text-[#A5A1A4] hover:border-white/20'
                         }`}
                       >
@@ -1556,7 +1710,7 @@ export function OrganizerWorkspacePage({
 
                         <div
                           className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition ${
-                            active ? 'bg-[#F02D50] text-white' : 'border border-white/20 bg-[#101013]'
+                            active ? 'bg-[#D72645] text-white' : 'border border-white/20 bg-[#101013]'
                           }`}
                         >
                           {active && <Check className="w-3 h-3 stroke-[3]" />}
@@ -1571,8 +1725,8 @@ export function OrganizerWorkspacePage({
 
             {/* Access Credentials Box */}
             <div className="p-4 rounded-xl bg-[#141418] border border-white/10 space-y-3">
-              <div className="flex items-center gap-2 font-mono font-bold text-[#F02D50] text-xs">
-                <Key className="w-4 h-4 text-[#F02D50]" />
+              <div className="flex items-center gap-2 font-mono font-bold text-[#D72645] text-xs">
+                <Key className="w-4 h-4 text-[#D72645]" />
                 <span>Tournament Access Credentials</span>
               </div>
               <p className="text-[#A5A1A4] text-[11px]">
@@ -1811,6 +1965,8 @@ export function OrganizerWorkspacePage({
         </div>
       )}
       </PageTransition3D>
+      </>
+      )}
 
       {/* MATCH SCORE & EVENTS EDITOR MODAL */}
       <MatchScoreEditorModal
@@ -1831,7 +1987,7 @@ export function OrganizerWorkspacePage({
         onClose={() => setIsMediaModalOpen(false)}
         teams={teams}
         players={players}
-        tournamentId={tournament.id}
+        tournamentId={tournament?.id || ''}
         onUploadSuccess={() => {
           setIsMediaModalOpen(false);
           onDataChanged();

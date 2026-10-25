@@ -37,21 +37,20 @@ export const ShareTournamentModal: React.FC<ShareTournamentModalProps> = ({
 
   // Retrieve or generate access codes for this tournament
   const accessCodes = localDataService.getAccessCodes(tournament.id);
-  let viewCode = accessCodes.find(c => c.role === 'VIEW' && c.is_active);
-  let scoreCode = accessCodes.find(c => c.role === 'SCORE' && c.is_active);
+  let viewCode = accessCodes.find(c => c.role === 'VIEW' && c.is_active && c.rawCode);
+  let scoreCode = accessCodes.find(c => c.role === 'SCORE' && c.is_active && c.rawCode);
 
   if (!viewCode) {
-    const gen = localDataService.generateAccessCode(tournament.id, 'VIEW', 'Viewer Access Code');
+    const gen = localDataService.generateAccessCode(tournament.id, 'VIEW', 'Participant Spectator Pass');
     viewCode = gen.code;
   }
   if (!scoreCode) {
-    const gen = localDataService.generateAccessCode(tournament.id, 'SCORE', 'Scorekeeper Access Code');
+    const gen = localDataService.generateAccessCode(tournament.id, 'SCORE', 'Collaborator Modifier Pass');
     scoreCode = gen.code;
   }
 
-  // Raw code formatting fallback
-  const rawViewCode = (viewCode as any).rawCode || `TX-VIEW-${tournament.id.slice(0, 4).toUpperCase()}`;
-  const rawScoreCode = (scoreCode as any).rawCode || `TX-SCORE-${tournament.id.slice(0, 4).toUpperCase()}`;
+  const rawViewCode = viewCode?.rawCode || '';
+  const rawScoreCode = scoreCode?.rawCode || '';
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareableUrl);

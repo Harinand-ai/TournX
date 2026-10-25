@@ -107,6 +107,7 @@ export interface AccessCode {
   last_used_at?: string | null;
   revoked_at?: string | null;
   created_at: string;
+  rawCode?: string;
 }
 
 export interface TournamentStage {

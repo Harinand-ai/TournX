@@ -64,26 +64,17 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(33,25,29,0.95)_0%,_rgba(25,25,31,0.85)_40%,_#101013_80%)] pointer-events-none" />
 
           {/* Crimson Horizon Atmosphere Ray */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[280px] bg-gradient-to-r from-transparent via-[#F02D50]/15 to-transparent blur-3xl pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[280px] bg-gradient-to-r from-transparent via-[#D72645]/15 to-transparent blur-3xl pointer-events-none" />
 
-          {/* Top Bar with Minimalist Skip Action */}
-          <div className="relative z-30 pt-5 px-6 flex items-center justify-between max-w-4xl w-full mx-auto">
+          {/* Minimalist Top Brand Bar (No skip button) */}
+          <div className="relative z-30 pt-6 px-6 flex items-center justify-between max-w-4xl w-full mx-auto">
             <div className="flex items-center gap-2 text-xs font-mono font-medium text-[#A5A1A4]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F02D50] animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#D72645] animate-pulse" />
               <span>TournX • 3D Football Engine</span>
             </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFinish();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#19191F] hover:bg-[#22222B] border border-white/10 rounded-lg text-xs text-[#A5A1A4] hover:text-[#F0E9E7] transition cursor-pointer shadow-sm group"
-            >
-              <span>Skip</span>
-              <FastForward className="w-3.5 h-3.5 text-[#F02D50] group-hover:translate-x-0.5 transition-transform" />
-            </button>
+            <div className="text-[10px] font-mono tracking-widest text-[#A5A1A4]/60 uppercase">
+              Initializing Experience
+            </div>
           </div>
 
           {/* Real Three.js WebGL 3D Dimensional Centerpiece */}
@@ -102,12 +93,12 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
                 size={210}
                 autoRotate={true}
                 interactive={true}
-                glowColor="#F02D50"
-                rimColor="#F02D50"
+                glowColor="#D72645"
+                rimColor="#991B35"
               />
             </motion.div>
 
-            {/* Expressive Italicized Wordmark Treatment */}
+            {/* Expressive Wordmark Treatment */}
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -115,7 +106,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
               className="text-center"
             >
               <h1 className="text-4xl sm:text-6xl font-black italic tracking-tight font-display text-[#F0E9E7]">
-                Tourn<span className="text-[#F02D50]">X</span>
+                Tourn<span className="text-[#D72645]">X</span>
               </h1>
 
               <motion.div
@@ -124,7 +115,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
                 transition={{ duration: 0.35, delay: 0.3 }}
                 className="mt-3.5 inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#19191F]/90 border border-white/10 text-[#F0E9E7] text-xs font-mono font-medium tracking-wider lowercase shadow-sm backdrop-blur-md"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[#F02D50]" />
+                <Sparkles className="w-3.5 h-3.5 text-[#D72645]" />
                 <span>think • prompt • organise</span>
               </motion.div>
             </motion.div>
@@ -137,7 +128,7 @@ export const OpeningAnimation: React.FC<OpeningAnimationProps> = ({ onComplete }
                 initial={{ width: '15%' }}
                 animate={{ width: '100%' }}
                 transition={{ duration: 1.6, ease: 'easeInOut' }}
-                className="h-full bg-[#F02D50] rounded-full shadow-[0_0_10px_rgba(240,45,80,0.9)]"
+                className="h-full bg-[#D72645] rounded-full shadow-[0_0_10px_rgba(215,38,69,0.9)]"
               />
             </div>
           </div>

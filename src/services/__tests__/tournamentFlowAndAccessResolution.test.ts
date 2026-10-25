@@ -178,5 +178,58 @@ describe('TournX — Tournament Flow, Access Code Resolution & 3D Transitions Re
       // Verify that session role for another tournament is isolated and remains ANONYMOUS
       expect(localDataService.getSessionRole('other-tournament-id')).toBe('ANONYMOUS');
     });
+
+    it('validates distinct role entry paths: participant, public viewer, and invited modifier', async () => {
+      const publicTourney = localDataService.createTournament({
+        name: 'Public Open Cup',
+        visibility: 'PUBLIC',
+      });
+
+      const privateTourney = localDataService.createTournament({
+        name: 'Private Champions League',
+        visibility: 'PRIVATE',
+      });
+
+      const vCode = localDataService.generateAccessCode(privateTourney.id, 'VIEW', 'Participant Pass');
+      const mCode = localDataService.generateAccessCode(privateTourney.id, 'SCORE', 'Modifier Pass');
+
+      // 1. Participant entry validates participant code and rejects modifier codes
+      const partRes = await tournamentService.resolveParticipantAccess(vCode.rawCode);
+      expect(partRes.success).toBe(true);
+      expect(partRes.role).toBe('VIEW');
+      expect(partRes.tournament?.id).toBe(privateTourney.id);
+
+      // Participant entry using prefix TX-VIEW-
+      const prefixedRes = await tournamentService.resolveParticipantAccess(`TX-VIEW-${vCode.rawCode}`);
+      expect(prefixedRes.success).toBe(true);
+      expect(prefixedRes.tournament?.id).toBe(privateTourney.id);
+
+      // Participant entry rejects modifier code
+      const rejectModRes = await tournamentService.resolveParticipantAccess(`TX-SCORE-${mCode.rawCode}`);
+      expect(rejectModRes.success).toBe(false);
+      expect(rejectModRes.error).toContain('Modifier');
+
+      // 2. Public tournament lookup allows public tournaments and rejects private ones
+      const pubRes = await tournamentService.resolvePublicTournament(publicTourney.slug || '');
+      expect(pubRes.success).toBe(true);
+      expect(pubRes.tournament?.id).toBe(publicTourney.id);
+
+      const privRes = await tournamentService.resolvePublicTournament(privateTourney.slug || '');
+      expect(privRes.success).toBe(false);
+      expect(privRes.error).toContain('private');
+
+      // 3. Modifier entry validates modifier code and rejects view codes
+      const modRes = await tournamentService.resolveModifierAccess(`TX-SCORE-${mCode.rawCode}`, { id: 'test-user', email: 'mod@tournx.com' });
+      expect(modRes.success).toBe(true);
+      expect(modRes.role).toBe('SCORE');
+
+      const modRejectView = await tournamentService.resolveModifierAccess(`TX-VIEW-${vCode.rawCode}`, { id: 'test-user', email: 'mod@tournx.com' });
+      expect(modRejectView.success).toBe(false);
+      expect(modRejectView.error).toContain('participant');
+
+      // 4. Fresh organizer data isolation
+      const freshOrganizerTourneys = localDataService.getOrganizerTournaments('new-organizer-uid-999');
+      expect(freshOrganizerTourneys).toHaveLength(0);
+    });
   });
 });

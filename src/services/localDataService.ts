@@ -992,11 +992,12 @@ class LocalDataService {
       tournament_id: tournamentId,
       role,
       code_hash: codeHash,
-      label: label || `${role} Access Code`,
+      label: label || (role === 'VIEW' ? 'Spectator Pass' : 'Scorekeeper Pass'),
       is_active: true,
       use_count: 0,
       expires_at: expiresAt,
       created_at: now.toISOString(),
+      rawCode,
     };
 
     const existing = this.getAccessCodes(tournamentId);
@@ -1092,15 +1093,23 @@ class LocalDataService {
 
     const normalized = trimmed.toUpperCase();
     const unhyphenated = normalized.replace(/[^A-Z0-9]/g, '');
-    const expectedHash = sha256Sync(`tx_salt_${normalized}`);
-    const unhyphenatedHash = sha256Sync(`tx_salt_${unhyphenated}`);
+    const bareCode = normalized.replace(/^TX-(VIEW|SCORE)-/, '');
+
+    // Permutations of possible hashes to support with/without prefix, with/without hyphens
+    const candidateHashes = new Set<string>([
+      sha256Sync(`tx_salt_${normalized}`),
+      sha256Sync(`tx_salt_${unhyphenated}`),
+      sha256Sync(`tx_salt_${bareCode}`),
+      sha256Sync(`tx_salt_TX-VIEW-${bareCode}`),
+      sha256Sync(`tx_salt_TX-SCORE-${bareCode}`),
+      sha256Sync(`tx_salt_TXVIEW${unhyphenated.replace(/^TX(VIEW|SCORE)/, '')}`),
+      sha256Sync(`tx_salt_TXSCORE${unhyphenated.replace(/^TX(VIEW|SCORE)/, '')}`),
+    ]);
 
     const all = this.getAllTournaments();
     for (const tourney of all) {
       const codes = this.getAccessCodes(tourney.id);
-      const found = codes.find(
-        c => c.code_hash === expectedHash || (unhyphenated && c.code_hash === unhyphenatedHash)
-      );
+      const found = codes.find(c => candidateHashes.has(c.code_hash));
 
       if (found) {
         if (!found.is_active) {
@@ -1136,6 +1145,20 @@ class LocalDataService {
       success: false,
       error: 'Invalid or revoked access code. Please check your code and try again.',
     };
+  }
+
+  /**
+   * Returns only tournaments owned or created by the specified organizer.
+   * For fresh accounts, returns an empty array (never demo or other users' tournaments).
+   */
+  public getOrganizerTournaments(userId?: string): Tournament[] {
+    if (!userId) return [];
+    const all = this.getAllTournaments();
+    return all.filter(t => 
+      t.id !== DEMO_TOURNAMENT_ID && 
+      !this.isTournamentDeleted(t.id) &&
+      (t.created_by === userId || (t as any).organizerId === userId || (userId === 'dev-admin' && ((t as any).organizerId === 'dev-admin' || t.created_by === 'dev-admin')))
+    );
   }
 
 

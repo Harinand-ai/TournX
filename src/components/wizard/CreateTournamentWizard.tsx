@@ -766,8 +766,8 @@ export function CreateTournamentWizard({
       }
 
       // Generate human-readable access codes for sharing
-      const vCode = localDataService.generateAccessCode(newTournament.id, 'VIEW', 'Participant Viewer Code');
-      const mCode = localDataService.generateAccessCode(newTournament.id, 'SCORE', 'Collaborator Modifier Code');
+      const vCode = await tournamentService.generateAccessCode(newTournament.id, 'VIEW', 'Participant Spectator Pass');
+      const mCode = await tournamentService.generateAccessCode(newTournament.id, 'SCORE', 'Collaborator Modifier Pass');
       setViewerAccessCode(vCode.rawCode);
       setModifierAccessCode(mCode.rawCode);
 

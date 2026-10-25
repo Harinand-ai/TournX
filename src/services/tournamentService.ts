@@ -23,7 +23,7 @@ import {
   POTMCandidate,
   POTMVote,
 } from '../types/tournament';
-import { Tournament } from '../types/multiTenant';
+import { Tournament, AccessCode } from '../types/multiTenant';
 import { localDataService, slugify, DEMO_TOURNAMENT_ID, TournamentInvite } from './localDataService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -75,6 +75,39 @@ class TournamentService {
       }
     }
     return localDataService.getAllTournaments();
+  }
+
+  /**
+   * Returns only tournaments owned or administered by the authenticated organizer.
+   * Isolates organizer data so users never see other organizers' private tournaments.
+   * Returns an empty list for fresh organizer accounts.
+   */
+  async getOrganizerTournaments(userId?: string): Promise<Tournament[]> {
+    if (!userId) return [];
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('tournaments')
+          .select('*')
+          .neq('status', 'ARCHIVED')
+          .eq('created_by', userId)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          const cloudList = (data as Tournament[]).filter(t => 
+            !t.deleted_at && 
+            t.status !== 'ARCHIVED' &&
+            !localDataService.isTournamentDeleted(t.id) &&
+            t.id !== 'd3959224-cfab-48b0-b9db-81125f0d85ad' &&
+            t.slug !== 'prem'
+          );
+          return cloudList;
+        }
+      } catch (err) {
+        console.warn('[TournX] Notice fetching cloud organizer tournaments:', err);
+      }
+    }
+    return localDataService.getOrganizerTournaments(userId);
   }
 
   async getTournament(idOrSlug: string): Promise<Tournament | null> {
@@ -848,7 +881,36 @@ class TournamentService {
     localDataService.deletePlayer(id, tournamentId);
   }
 
-  // ================= ACCESS CODE REDEMPTION =================
+  // ================= ACCESS CODE & ROLE RESOLUTION =================
+
+  /**
+   * Generates a new access code and synchronizes it across dual local/cloud models.
+   */
+  async generateAccessCode(
+    tournamentId: string,
+    role: 'VIEW' | 'SCORE',
+    label?: string,
+    expiresInDays?: number
+  ): Promise<{ rawCode: string; code: AccessCode }> {
+    const localResult = localDataService.generateAccessCode(tournamentId, role, label, expiresInDays);
+    
+    // In cloud mode, sync to Supabase access_codes table if tournament exists and user is authenticated
+    if (isSupabaseConfigured && supabase && isValidUuid(tournamentId)) {
+      try {
+        await supabase.from('access_codes').insert({
+          tournament_id: tournamentId,
+          role,
+          code_hash: localResult.code.code_hash,
+          label: localResult.code.label,
+          is_active: true,
+          expires_at: localResult.code.expires_at,
+        });
+      } catch (err) {
+        console.warn('[TournX] Notice saving cloud access code:', err);
+      }
+    }
+    return localResult;
+  }
 
   async verifyAccessCode(
     tournamentId: string,
@@ -856,22 +918,251 @@ class TournamentService {
   ): Promise<{ success: boolean; role?: 'VIEW' | 'SCORE'; label?: string; error?: string }> {
     if (isSupabaseConfigured && supabase && isValidUuid(tournamentId)) {
       const voterId = localDataService.getOrCreateVoterId();
-      const { data, error } = await supabase.rpc('redeem_tournament_access_code', {
-        p_tournament_id: tournamentId,
-        p_code: rawCode.trim().toUpperCase(),
-        p_client_identifier: voterId,
-      });
+      try {
+        const { data, error } = await supabase.rpc('redeem_tournament_access_code', {
+          p_tournament_id: tournamentId,
+          p_code: rawCode.trim().toUpperCase(),
+          p_client_identifier: voterId,
+        });
 
-      if (error) {
-        return { success: false, error: `Cloud RPC error: ${error.message}` };
+        if (!error && data && data.success) {
+          localDataService.setSessionRole(tournamentId, data.role);
+          return { success: true, role: data.role, label: data.label };
+        }
+      } catch (rpcErr) {
+        console.warn('[TournX] Notice during cloud verifyAccessCode:', rpcErr);
       }
-      if (data && data.success) {
-        localDataService.setSessionRole(tournamentId, data.role);
-        return { success: true, role: data.role, label: data.label };
-      }
-      return { success: false, error: data?.error || 'Invalid or revoked access code.' };
     }
     return localDataService.verifyAccessCode(tournamentId, rawCode);
+  }
+
+  /**
+   * Option 1: Dedicated Participant Access validation.
+   * Accepts participant code (e.g. TX-VIEW-XXXXXX) or participant link.
+   * Rejects modifier codes, verifies active code, and grants read-only VIEW role.
+   */
+  async resolveParticipantAccess(
+    rawInput: string
+  ): Promise<{ success: boolean; tournament?: Tournament; role?: 'VIEW'; label?: string; error?: string }> {
+    const trimmed = (rawInput || '').trim();
+    if (!trimmed) {
+      return { success: false, error: 'Please enter a participant access code or tournament link.' };
+    }
+
+    // Guard: Prevent modifiers from entering through participant entry
+    if (trimmed.toUpperCase().includes('TX-SCORE-')) {
+      return {
+        success: false,
+        error: 'This code is a collaborator modifier pass. Please use the Invited Modifier Access option below.',
+      };
+    }
+
+    // 1. Direct URL check: /t/:slug or /t/:slug?code=...
+    const urlMatch = trimmed.match(/(?:^|\/)t\/([a-zA-Z0-9_-]+)/);
+    const codeParamMatch = trimmed.match(/[?&]code=([a-zA-Z0-9_-]+)/i);
+    const codeToTest = codeParamMatch ? codeParamMatch[1] : trimmed;
+
+    // 2. Test code resolution via localDataService
+    const localResult = localDataService.resolveTournamentByAccessCode(codeToTest);
+    if (localResult.success && localResult.tournament) {
+      if (localResult.role === 'SCORE') {
+        return {
+          success: false,
+          error: 'This code is a collaborator modifier pass. Please use the Invited Modifier Access option below.',
+        };
+      }
+      localDataService.setSessionRole(localResult.tournament.id, 'VIEW');
+      return {
+        success: true,
+        tournament: localResult.tournament,
+        role: 'VIEW',
+        label: localResult.label,
+      };
+    }
+
+    // 3. Fallback: If URL slug was provided, check if tournament exists and is public
+    if (urlMatch && urlMatch[1]) {
+      const tourney = await this.getTournament(urlMatch[1]);
+      if (tourney && tourney.visibility === 'PUBLIC') {
+        localDataService.registerTournament(tourney);
+        localDataService.setSessionRole(tourney.id, 'VIEW');
+        return {
+          success: true,
+          tournament: tourney,
+          role: 'VIEW',
+          label: 'Public Participant',
+        };
+      }
+    }
+
+    // 4. In cloud mode, try syncing cloud tournaments into local registry to check
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: cloudTourneys } = await supabase
+          .from('tournaments')
+          .select('*')
+          .neq('status', 'ARCHIVED')
+          .limit(30);
+
+        if (cloudTourneys && cloudTourneys.length > 0) {
+          for (const ct of cloudTourneys) {
+            localDataService.registerTournament(ct as Tournament);
+          }
+          const retryResult = localDataService.resolveTournamentByAccessCode(codeToTest);
+          if (retryResult.success && retryResult.tournament) {
+            if (retryResult.role === 'SCORE') {
+              return {
+                success: false,
+                error: 'This code is a collaborator modifier pass. Please use the Invited Modifier Access option.',
+              };
+            }
+            localDataService.setSessionRole(retryResult.tournament.id, 'VIEW');
+            return {
+              success: true,
+              tournament: retryResult.tournament,
+              role: 'VIEW',
+              label: retryResult.label,
+            };
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('[TournX] Notice syncing cloud tournaments for participant access:', cloudErr);
+      }
+    }
+
+    return {
+      success: false,
+      error: localResult.error || 'Participant access code not found or has expired. Please check your code and try again.',
+    };
+  }
+
+  /**
+   * Option 2: Public Viewer / Public Hub Lookup.
+   * Accepts public link or tournament slug. Validates tournament is explicitly PUBLIC.
+   * Never exposes private drafts, owner info, or administrative controls.
+   */
+  async resolvePublicTournament(
+    slugOrUrl: string
+  ): Promise<{ success: boolean; tournament?: Tournament; role?: 'VIEW'; error?: string }> {
+    const trimmed = (slugOrUrl || '').trim();
+    if (!trimmed) {
+      return { success: false, error: 'Please enter a public tournament link or tournament slug.' };
+    }
+
+    // Extract slug from URL if pasted as full link
+    const urlMatch = trimmed.match(/(?:^|\/)t\/([a-zA-Z0-9_-]+)/);
+    const targetSlug = urlMatch ? urlMatch[1] : trimmed;
+
+    const tourney = await this.getTournament(targetSlug);
+    if (!tourney) {
+      return {
+        success: false,
+        error: 'Tournament not found. Please verify the public link or slug.',
+      };
+    }
+
+    if (tourney.deleted_at || tourney.status === 'ARCHIVED') {
+      return {
+        success: false,
+        error: 'This tournament is no longer available.',
+      };
+    }
+
+    // Public access must be explicitly allowed
+    if (tourney.visibility !== 'PUBLIC') {
+      return {
+        success: false,
+        error: 'This tournament is private. An organizer access code or participant invitation is required to view it.',
+      };
+    }
+
+    localDataService.registerTournament(tourney);
+    localDataService.setSessionRole(tourney.id, 'VIEW');
+    localDataService.setLastJoinedTournament(tourney.id, tourney.slug || undefined);
+
+    return {
+      success: true,
+      tournament: tourney,
+      role: 'VIEW',
+    };
+  }
+
+  /**
+   * Option 3: Invited Modifier Access.
+   * Verifies collaborator passcode or invite record.
+   * Requires authenticated identity before granting modifier permissions.
+   * Unlocks editing restricted only to matches, scores, status, schedules, and venues.
+   */
+  async resolveModifierAccess(
+    rawInput: string,
+    currentUser?: { id: string; email?: string } | null
+  ): Promise<{
+    success: boolean;
+    tournament?: Tournament;
+    role?: 'SCORE';
+    label?: string;
+    requiresAuth?: boolean;
+    error?: string;
+  }> {
+    const trimmed = (rawInput || '').trim();
+    if (!trimmed) {
+      return { success: false, error: 'Please enter a collaborator modifier passcode or invitation link.' };
+    }
+
+    // Guard: Prevent spectator codes from claiming modifier rights
+    if (trimmed.toUpperCase().includes('TX-VIEW-')) {
+      return {
+        success: false,
+        error: 'This is a spectator/participant pass and does not grant modifier privileges.',
+      };
+    }
+
+    // Server-side identity validation requirement
+    if (isSupabaseConfigured && !currentUser) {
+      return {
+        success: false,
+        requiresAuth: true,
+        error: 'Collaborator privileges require an authenticated account. Please sign in or register to verify your identity before modifier access can be granted.',
+      };
+    }
+
+    // Check code in local registry
+    const localResult = localDataService.resolveTournamentByAccessCode(trimmed);
+    if (localResult.success && localResult.tournament) {
+      if (localResult.role !== 'SCORE') {
+        return {
+          success: false,
+          error: 'This access code is not authorized for tournament modifier privileges.',
+        };
+      }
+
+      // Record collaborator membership if authenticated user present
+      if (currentUser && isSupabaseConfigured && supabase && isValidUuid(localResult.tournament.id)) {
+        try {
+          await supabase.from('tournament_members').upsert({
+            tournament_id: localResult.tournament.id,
+            user_id: currentUser.id,
+            role: 'SCORE',
+          }, { onConflict: 'tournament_id,user_id' });
+        } catch (memErr) {
+          console.warn('[TournX] Notice updating tournament member role:', memErr);
+        }
+      }
+
+      localDataService.setSessionRole(localResult.tournament.id, 'SCORE');
+      localDataService.setActiveTournamentId(localResult.tournament.id);
+      return {
+        success: true,
+        tournament: localResult.tournament,
+        role: 'SCORE',
+        label: localResult.label || 'Collaborator Modifier',
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Modifier passcode not found, revoked, or expired. Please check your invitation details.',
+    };
   }
 
   /**
@@ -900,26 +1191,15 @@ class TournamentService {
           .from('tournaments')
           .select('*')
           .neq('status', 'ARCHIVED')
-          .limit(20);
+          .limit(30);
 
         if (!tourneyErr && cloudTournaments && cloudTournaments.length > 0) {
-          const voterId = localDataService.getOrCreateVoterId();
-          const normalizedCode = trimmed.toUpperCase();
           for (const tourney of cloudTournaments) {
-            const { data, error } = await supabase.rpc('redeem_tournament_access_code', {
-              p_tournament_id: tourney.id,
-              p_code: normalizedCode,
-              p_client_identifier: voterId,
-            });
-
-            if (!error && data && data.success) {
-              const cloudTourney = tourney as Tournament;
-              localDataService.registerTournament(cloudTourney);
-              localDataService.setActiveTournamentId(cloudTourney.id);
-              localDataService.setSessionRole(cloudTourney.id, data.role);
-              localDataService.setLastJoinedTournament(cloudTourney.id, cloudTourney.slug || undefined);
-              return { success: true, tournament: cloudTourney, role: data.role, label: data.label };
-            }
+            localDataService.registerTournament(tourney as Tournament);
+          }
+          const retryLocal = localDataService.resolveTournamentByAccessCode(trimmed);
+          if (retryLocal.success) {
+            return retryLocal;
           }
         }
       } catch (cloudErr) {
